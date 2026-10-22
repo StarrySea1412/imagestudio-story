@@ -1,0 +1,111 @@
+<section class="chapter" id="ch2">
+  <div class="ch-head">
+    <div class="ch-num">SCENE<b>02</b></div>
+    <div class="ch-title">
+      <h2>渠道是会撒谎的接口</h2>
+      <p>48 条渠道，没有一条是我在这个工作台里手工敲进去的。而它们对自己能干什么的描述，全都靠一个字符串在猜。</p>
+    </div>
+  </div>
+  <div class="ch-body">
+    <p class="lede">先看一个数字：这台机器上的 <code>db.json</code> 里有 <strong>48 个渠道</strong>，而真正生成过的作品只有 4 张。比例荒唐得像个笑话，但它精确地描述了一个私人工具的真实处境——渠道是收集来的，作品是稀缺的。</p>
+    <p>这些渠道来自一次扫描。功能叫「站点接入」，实现是三个只读探针：CC Switch 的 SQLite 库、<code>~/.claude/settings.json</code>、<code>~/.codex/config.toml</code> + <code>auth.json</code>。它们把我在别的 agent 工具里配过的 base URL、key 和模型线索全捞出来，去重、脱敏、列成一个可勾选的清单。</p>
+
+    <h3>读别人的库，先学会不弄坏它</h3>
+    <p>CC Switch 在运行时会不停地写那个库。直接开它，轻则读到半份数据，重则和它抢锁。所以扫描器的第一步是把 <code>.db</code>、<code>-wal</code>、<code>-shm</code> 三个文件一起复制到临时目录，再打开副本——WAL 不能少，少了就是一份少了最近提交的快照。</p>
+    <p>然后是重试。复制出来的快照偶尔仍然不一致，代码用三次尝试、400ms 和 800ms 的同步等待兜底。同步等待在这里是可耻但正确的：它跑在一个显式的、用户点了按钮才触发的动作里，阻塞两秒比返回一个残缺的渠道列表要好。</p>
+    <div class="code">
+      <div class="code-bar"><b>src/import-scan.js</b><span>readCcSwitchProviders</span></div>
+<pre><span class="c">// CC Switch 运行中会频繁写库,复制出的快照偶发不一致:重试几次通常可恢复</span>
+<span class="k">for</span> (<span class="k">let</span> attempt = <span class="n">0</span>; attempt &lt; <span class="n">3</span>; attempt += <span class="n">1</span>) {
+  <span class="k">try</span> {
+    readCcSwitchProvidersOnce(dbPath, list, seen);
+    <span class="k">return</span>;
+  } <span class="k">catch</span> {
+    <span class="k">if</span> (attempt === <span class="n">2</span>) <span class="k">return</span>;
+    <span class="k">const</span> wait = <span class="n">400</span> * (attempt + <span class="n">1</span>);
+    <span class="k">const</span> until = Date.now() + wait;
+    <span class="k">while</span> (Date.now() &lt; until) { <span class="c">/* 同步等待 */</span> }
+  }
+}</pre>
+    </div>
+    <p>去重用的不是渠道名，是 <code>sha1(小写 baseUrl + '|' + apiKey)</code> 的前 16 位。同名不同 key 是两条渠道，同 key 不同名是一条——因为名字是人起的，而「同一个地址配同一把钥匙」才是物理意义上的同一个入口。</p>
+    <p>但 key 不进前端。接口返回前会被 <code>publicProvider()</code> 剥掉 <code>apiKey</code>、<code>proxyUrl</code>、<code>cookie</code> 三个字段，换成三个布尔量和一个掩码：前 3 位 + 四个圆点 + 后 4 位，短于 8 位直接全遮。这条规则的动机很朴素——列表会被截图，会出现在录屏里，会被人发到群里问「这个站有人用过吗」。</p>
+
+    <h3>体检：一次 15 秒的拷问</h3>
+    <p>渠道配好之后，第一件要做的事是问它「你到底有哪些模型」。这动作叫体检，接口是 <code>POST /api/providers/discover-all</code>。它把所有启用的渠道塞进一个队列，四个 worker 并发处理，每个渠道发一次 <code>GET {base}/models</code>，15 秒超时。</p>
+    <p>难点在于地址。有的站是 <code>https://x.com</code>，模型在 <code>/v1/models</code>；有的直接给你 <code>https://x.com/v1</code>；有的把生图和对话拆成两条完全不同的路径；还有一些中转站，模型列表挂在 <code>/api/claudecode</code>、<code>/api/anthropic</code>、<code>/coding</code> 这类非标准前缀下。代码里为此维护了一张候选表：先按 URL 的形态推出 <code>/v1/models</code>，再加上兼容后缀反推根路径，逐个试。</p>
+    <div class="code">
+      <div class="code-bar"><b>src/provider-service.js</b><span>COMPAT_SUFFIXES 与失败策略</span></div>
+<pre><span class="k">const</span> COMPAT_SUFFIXES = [
+  <span class="s">'/api/claudecode'</span>, <span class="s">'/api/anthropic'</span>, <span class="s">'/apps/anthropic'</span>, <span class="s">'/api/coding'</span>,
+  <span class="s">'/claudecode'</span>, <span class="s">'/anthropic'</span>, <span class="s">'/step_plan'</span>, <span class="s">'/coding'</span>, <span class="s">'/claude'</span>
+];
+
+<span class="c">// 404 / 405 说明这条路没有路由，换下一条；401 / 403 说明钥匙不对，换端点也没用</span>
+<span class="k">if</span> ([<span class="n">404</span>, <span class="n">405</span>].includes(response.status)) {
+  lastError = error;
+  <span class="k">continue</span>;
+}
+<span class="k">throw</span> error;</pre>
+    </div>
+    <p>这个区分是整个项目里我最满意的一处小设计：<strong>把「找不到路」和「进不去门」当成两件不同的事。</strong>找不到路就继续试，进不去门就立刻停。很多自动探测写得又慢又吵，就是因为把两者混为一谈，拿着过期的 key 把八个候选端点挨个撞一遍。</p>
+    <p>体检的产物是一个 <code>discovery</code> 对象：体检时间、模型总数、生图模型列表（最多留 40 个）、视频模型列表（20 个）、全部模型 ID（120 个）、错误信息、以及一个可选的余额数字。余额靠两次额外请求：<code>/dashboard/billing/subscription</code> 拿硬额度，<code>/dashboard/billing/usage</code> 拿已用，两个 8 秒超时，任一失败就默默不显示。不是所有站都有这两个接口，绝大多数没有。</p>
+
+    <h3>能力是猜的，而且猜得很粗</h3>
+    <p>这是这一章必须说清楚的地方。模型能不能生图，系统并不知道。它只知道模型名里有没有这些词：</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>能力</th><th>命中的关键词（节选）</th></tr></thead>
+        <tbody>
+          <tr><td><span class="tag warn">生图</span></td><td><code>image</code> <code>dall</code> <code>flux</code> <code>stable-diffusion</code> <code>sdxl</code> <code>imagen</code> <code>ideogram</code> <code>kolors</code> <code>qwen-image</code> <code>seedream</code></td></tr>
+          <tr><td><span class="tag">视频</span></td><td><code>sora</code> <code>video</code> <code>kling</code> <code>seedance</code> <code>hailuo</code> <code>veo</code> <code>wanx</code> <code>pika</code> <code>runway</code> <code>ltx</code> <code>mochi</code></td></tr>
+          <tr><td><span class="tag ok">视觉</span></td><td><code>vision</code> <code>vl</code> <code>gpt-4o</code> <code>gemini</code> <code>qwen-vl</code> <code>llava</code></td></tr>
+          <tr><td><span class="tag">文本</span></td><td><code>gpt</code> <code>claude</code> <code>deepseek</code> <code>llama</code> <code>chat</code>……以及<strong>所有什么都没命中的模型</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>这四条规则有两个必然的误判，而且在这个项目的日常里都以真实案例出现过：</p>
+    <ul>
+      <li><strong>真的能生图、但名字不含关键词的模型会被判成文本。</strong>最典型的就是那些把路由交给上游的站，模型名直接叫 <code>auto</code>。按规则它一条都不命中，于是被归进「文本」——它明明是最强的那条生图入口，却永远进不了自动降级的候选池。</li>
+      <li><strong>名字含关键词、但其实只做对话的模型会被判成生图。</strong>反过来同样成立：有人在对话模型名里塞了 <code>image</code> 做营销，体检就会把它列进生图列表，直到第一次真调用才露馅。</li>
+    </ul>
+    <div class="note"><b>所以列表必须可折叠。</b>真实使用里，48 条渠道意味着 76 行、每行带一串模型标签。这个页面最初是整段平铺的，翻三屏都翻不到底；后来改成整段可折叠，只剩一行头，开合状态记在本地。这不是审美问题，是「你会不会真的去用它」的问题。</div>
+
+    <figure class="fig">
+      <div class="frame"><img src="assets/art/probe.webp" alt="黑暗空间里悬着几十只发光灯泡，由细线连成网络；多数亮着暖光，少数灰暗熄灭，一颗青绿色光点正沿线路移动" width="1024" height="1024"/></div>
+      <figcaption><b>FIG. 02</b>渠道体检的实质：挨个敲门，记下哪些灯亮着。亮着的未必能生图，灭着的也未必真死——只是这十五秒里没应答。</figcaption>
+    </figure>
+
+    <h3>把这件事摊开</h3>
+    <p>下面这枚小样用源码里那四张关键词表做判定，你可以让主力渠道「挂掉」，看巡检会挑谁接班；也可以把某个渠道标成「已锁定」，看它在失败面前只能干等。特别注意那个叫 <code>auto</code> 的渠道——它有生图能力，但一条关键词都不命中。</p>
+  </div>
+
+  <div class="demo" id="demo-clinic">
+    <div class="demo-head">
+      <span class="demo-tag">DEMO 01</span>
+      <span class="demo-title">渠道体检台 <span class="hint">点一行设为主力，再让它挂掉</span></span>
+    </div>
+    <div class="demo-body">
+      <div class="controls">
+        <label class="switch"><input id="cl-paid" type="checkbox"/>把「auto」那条的模型手动标成生图</label>
+        <label class="switch"><input id="cl-lock" type="checkbox"/>锁定主力，不自动切换</label>
+        <button type="button" class="seg" id="cl-kill" style="border:1px solid var(--line);background:var(--screen);padding:7px 12px;font-family:var(--mono);font-size:11px;color:var(--amber);letter-spacing:.03em;border-radius:3px">模拟主力挂掉</button>
+      </div>
+      <div class="clinic-grid">
+        <div>
+          <div class="clinic" id="cl-list"></div>
+          <p class="hintline" style="margin-top:10px">能力标签由模型名关键词推断：<b style="color:var(--amber)">生图</b> / <b style="color:var(--teal)">视频</b> / <b style="color:#a9c4a0">视觉</b> / 文本（兜底）。真实系统还会用一次 <code>/models</code> 探活确认，但确认不了能力。</p>
+        </div>
+        <div class="clinic-side">
+          <h5>巡检判定</h5>
+          <div class="kv"><span>主力</span><b id="cl-main">—</b></div>
+          <div class="kv"><span>主力生图模型</span><b id="cl-main-models">0</b></div>
+          <div class="kv"><span>可接班渠道</span><b id="cl-cand">0</b></div>
+          <div class="kv"><span>巡检间隔</span><b>10 min</b></div>
+          <div class="evt" id="cl-events"></div>
+        </div>
+      </div>
+    </div>
+    <div class="demo-foot"><b>判定依据</b>：候选 = 除主力外、启用中、有 baseUrl、<code>discovery.imageModels.length &gt; 0</code> 的渠道，按生图模型数量降序取第一个；若 <code>roles.image.locked</code> 为真则只记一条事件，不切。</div>
+  </div>
+</section>

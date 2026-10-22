@@ -1,0 +1,130 @@
+<section class="chapter" id="ch6">
+  <div class="ch-head">
+    <div class="ch-num">SCENE<b>06</b></div>
+    <div class="ch-title">
+      <h2>谁写了这句话</h2>
+      <p>一张图旁边的那段提示词，可能是作者写的，可能是它的工具写的，也可能是你的视觉模型看了一眼之后猜的。这三件事不能共用一个字段。</p>
+    </div>
+  </div>
+  <div class="ch-body">
+    <p class="lede">图库里最常见的一个动作是「复制提示词」。这个动作隐含一个假设：提示词是作者写的。可现实里它有三个来源——生成工具写进 PNG 的参数块、作者手填的说明、以及模型看图反推出来的猜测。三者的可信度差着一个数量级，混在一起，就是这套系统开始撒谎的地方。</p>
+
+    <h3>PNG 里藏着一个时代</h3>
+    <p>PNG 允许携带若干文本块：<code>tEXt</code>（不压缩）、<code>zTXt</code>（zlib 压缩）、<code>iTXt</code>（国际化，可指定语言与翻译）。Stable Diffusion 生态把这套机制用成了一种约定俗成的元数据格式，于是今天一张 AI 图里可能同时躺着三套互不兼容的方言。</p>
+    <p>读取器是手写的，不依赖任何图像库：从 PNG 签名开始，逐块读长度与类型，遇到 <code>tEXt</code> 取 key\0value，遇到 <code>zTXt</code> 用 zlib 解压。两个上限：单个 chunk 超过 16MB 停止，所有文本累计超过 2MB 停止。解压还带了 <code>maxOutputLength</code>——这是防 zip bomb 的，一个 1KB 的压缩块可以膨胀成 1GB，必须在解压时就掐死，而不是解完再检查。</p>
+    <div class="code">
+      <div class="code-bar"><b>src/image-metadata.js</b><span>readPngText（节选）</span></div>
+<pre><span class="k">if</span> (type === <span class="s">'zTXt'</span>) {
+  <span class="k">const</span> zero = data.indexOf(<span class="n">0</span>);
+  <span class="k">if</span> (zero &gt; <span class="n">0</span> &amp;&amp; data[zero + <span class="n">1</span>] === <span class="n">0</span>) {
+    <span class="k">const</span> expanded = zlib.inflateSync(data.subarray(zero + <span class="n">2</span>), {
+      maxOutputLength: maxTextBytes - textBytes
+    });
+    textBytes += expanded.length;
+    <span class="k">if</span> (textBytes &gt; maxTextBytes) <span class="k">break</span>;
+    result[data.toString(<span class="s">'latin1'</span>, <span class="n">0</span>, zero)] = expanded.toString(<span class="s">'utf8'</span>);
+  }
+}</pre>
+    </div>
+
+    <h3>三种方言，一个出口</h3>
+    <p>三套格式的解析难度差很远：</p>
+    <ul>
+      <li><strong>A1111</strong>：纯文本，三段结构——正向提示词、<code>Negative prompt:</code> 之后是负向、最后一行 <code>Steps: 28, Sampler: Euler a, CFG scale: 7, Seed: 12345, Size: 1024x1024</code>。用两个正则定出边界，再把参数行按逗号切成键值对。这是最容易、也最常见的一种。</li>
+      <li><strong>ComfyUI</strong>：<code>prompt</code> 字段是一整张节点图，JSON。要从中找出 <code>KSampler</code> 类节点，顺着它的 <code>positive</code>/<code>negative</code> 输入追溯上游，才能拿到那两段文本。它记录的不是「提示词」，是「这张图怎么被算出来的」。</li>
+      <li><strong>InvokeAI</strong>：<code>sd-metadata</code> / <code>invokeai_metadata</code> 里是结构化 JSON，字段名与 A1111 不同，正负向和参数都在不同键下。</li>
+    </ul>
+    <p>三个解析器最后都收敛到同一个出口：<code>finalizePromptResult()</code>，产出 <code>exact: true, inferred: false, source: 'AUTOMATIC1111 PNG Info' | 'ComfyUI workflow' | 'InvokeAI metadata'</code>。<strong>exact 的意思是「这段文字是从文件里读出来的，不是想出来的」</strong>，不是「这段文字一定生成了这张图」。</p>
+    <div class="note"><b>这个区别很重要。</b>PNG 里的参数块是自述。一台生成工具写什么，文件里就是什么，没有任何机制核对它真的用那段提示词算出了这张图。所以「exact」只保证来源，不保证因果。</div>
+
+    <h3>读不到的时候，说读不到</h3>
+    <p>没有元数据的图占多数。微信、截图、二次压缩、格式转换，任何一步都能把文本块抹掉。这时候系统有两条路：</p>
+    <ol>
+      <li><strong>有视觉模型</strong>：把图发给它，要求返回 JSON（<code>prompt</code> / <code>negativePrompt</code> / <code>keywords</code> / <code>style</code>），并明确要求「不要声称这是作者原始提示词」。结果标为 <code>exact: false, inferred: true</code>，界面上写「AI 推测，不是作者原始提示词」。</li>
+      <li><strong>没有视觉模型</strong>：<code>usable: false</code>，附一段人话说明「当前服务无法调用视觉模型反推；请切换到真实 Provider，或上传带 A1111 / ComfyUI / InvokeAI 参数的 PNG」。不编，不空着，也不假装成功。</li>
+    </ol>
+    <p>我更愿意把这两条路看成同一件事的两个档位：<strong>系统可以有不知道的东西，但不能有不知道却不说的地方。</strong>一个空的 prompt 字段和一个标着「推测」的 prompt 字段，对用户的含义完全不同；前者让人以为坏了，后者让人知道该信几分。</p>
+
+    <h3>润色：一个必须返回 JSON 的模型</h3>
+    <p>提示词润色走的是文本模型。<code>system</code> 提示里把要求写死：保留主体与意图，补充构图、环境、光线、镜头、材质和色彩；不要添加冲突主体；<strong>返回且只返回 JSON</strong>，字段为 <code>polishedPrompt</code>、<code>negativePrompt</code>、<code>keywords</code>；并且特别强调 <code>polishedPrompt</code> 必须是「一段完整、独立、可直接提交给图像生成接口的正向提示词」，不能只给标题或关键词摘要。</p>
+    <p>最后那句是为了治一个很常见的病：模型被要求「润色」时，很喜欢返回一句总结式的标题，或者一串关键词，看着漂亮，丢进生图接口就废了。</p>
+    <p>解析端做了三层容错：</p>
+    <div class="code">
+      <div class="code-bar"><b>src/provider-service.js</b><span>parseJsonObject</span></div>
+<pre><span class="k">function</span> parseJsonObject(value) {
+  <span class="k">const</span> text = String(value || <span class="s">''</span>).trim()
+    .replace(<span class="s">/^\x60\x60\x60(?:json)?/i</span>, <span class="s">''</span>)   <span class="c">// 去掉开头的 ``` 或 ```json</span>
+    .replace(<span class="s">/\x60\x60\x60$/</span>, <span class="s">''</span>)                <span class="c">// 去掉结尾的 ```</span>
+    .trim();
+  <span class="k">try</span> { <span class="k">return</span> JSON.parse(text); } <span class="k">catch</span> {}
+  <span class="k">const</span> start = text.indexOf(<span class="s">'{'</span>);
+  <span class="k">const</span> end = text.lastIndexOf(<span class="s">'}'</span>);
+  <span class="k">if</span> (start &gt;= <span class="n">0</span> &amp;&amp; end &gt; start) {
+    <span class="k">try</span> { <span class="k">return</span> JSON.parse(text.slice(start, end + <span class="n">1</span>)); } <span class="k">catch</span> {}
+  }
+  <span class="k">return</span> <span class="k">null</span>;
+}</pre>
+    </div>
+    <p>第一层剥 Markdown 围栏，第二层从第一个 <code>{</code> 截到最后一个 <code>}</code>——很多模型会在 JSON 前后加一句「好的，以下是润色结果：」。第三层是字段名归一化：<code>polishedPrompt</code>、<code>polished_prompt</code>、<code>positivePrompt</code>、<code>prompt</code>、<code>enhancedPrompt</code> 都认，还会往 <code>data</code>/<code>result</code>/<code>output</code>/<code>content</code> 里再找一层。</p>
+    <p>全都失败呢？退回本地规则：把原提示词压掉多余空白，接上该风格的一串短语，再给一份固定负向词表。返回值里 <code>source</code> 从 <code>remote-text</code> 变成 <code>local-rules</code> 或 <code>remote-text-fallback</code>。界面上不隐瞒这个差别——你一眼就能看出这段「润色」是模型写的，还是模板拼的。</p>
+
+    <figure class="fig">
+      <div class="frame"><img src="assets/art/curate.webp" alt="俯拍暗色桌面：左侧一叠散乱的老照片，右侧四张空白卡片整齐排成一列，一把镊子正夹着其中一张照片移向卡片" width="1024" height="1024"/></div>
+      <figcaption><b>FIG. 05</b>整理照片的动作，和给记录填来源的动作是同一件事：先分清哪些是自己拍的，哪些是别人给的。</figcaption>
+    </figure>
+
+    <h3>自己翻一遍账本</h3>
+    <p>下面这枚小样有两个模式。左边选「读图」，切五种来源，看 <code>exact</code> / <code>inferred</code> / <code>usable</code> 三个开关怎么翻；左边选「润色」，切四种模型返回形态，看解析器在哪一层接住它、接不住时退回哪里。</p>
+  </div>
+
+  <div class="demo" id="demo-ledger">
+    <div class="demo-head">
+      <span class="demo-tag">DEMO 04</span>
+      <span class="demo-title">元数据账本 <span class="hint">谁写的，写在哪一栏</span></span>
+    </div>
+    <div class="demo-body">
+      <div class="controls">
+        <div class="ctl" style="min-width:200px">
+          <label>模式</label>
+          <div class="seg" id="lg-mode">
+            <button type="button" data-m="read" aria-pressed="true">读图</button>
+            <button type="button" data-m="polish">润色</button>
+          </div>
+        </div>
+        <div class="ctl" style="min-width:280px" id="lg-src-wrap">
+          <label>PNG 里的文本来源</label>
+          <div class="seg" id="lg-src">
+            <button type="button" data-s="a1111" aria-pressed="true">A1111</button>
+            <button type="button" data-s="comfy">ComfyUI</button>
+            <button type="button" data-s="invoke">InvokeAI</button>
+            <button type="button" data-s="desc">说明文字</button>
+            <button type="button" data-s="none">无文本</button>
+          </div>
+        </div>
+        <div class="ctl" style="min-width:280px;display:none" id="lg-shape-wrap">
+          <label>文本模型返回</label>
+          <div class="seg" id="lg-shape">
+            <button type="button" data-s="clean" aria-pressed="true">规范 JSON</button>
+            <button type="button" data-s="fence">```json 围栏</button>
+            <button type="button" data-s="chatty">解释 + JSON</button>
+            <button type="button" data-s="prose">纯文本</button>
+          </div>
+        </div>
+        <label class="switch" id="lg-vision-wrap"><input id="lg-vision" type="checkbox"/>配置了视觉模型</label>
+      </div>
+      <div class="ledger-grid">
+        <div class="ledger-in">
+          <label id="lg-raw-label">文件里的原始文本（节选）</label>
+          <div class="mono-block" id="lg-raw"></div>
+          <p class="hintline" id="lg-raw-note"></p>
+        </div>
+        <div class="ledger-out">
+          <div class="lh"><span>RECORD</span><span id="lg-flag"></span></div>
+          <div id="lg-rows"></div>
+          <div class="notice" id="lg-notice" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+    <div class="demo-foot"><b>依据</b>：解析顺序为 A1111 → ComfyUI → InvokeAI → 通用描述字段；都失败才走视觉反推。润色解析为剥围栏 → 花括号截取 → 字段归一化 → 本地规则兜底。</div>
+  </div>
+</section>

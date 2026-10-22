@@ -1,0 +1,111 @@
+<section class="chapter" id="ch5">
+  <div class="ch-head">
+    <div class="ch-num">SCENE<b>05</b></div>
+    <div class="ch-title">
+      <h2>打不过就换一条路</h2>
+      <p>降级不是「失败了再试一次」。降级是一张表格：哪种错值得换路，哪种错换了也白换。</p>
+    </div>
+  </div>
+  <div class="ch-body">
+    <p class="lede">这一章是全篇最像代码的一章，因为它讲的就是一张 <code>if</code> 表。这张表决定了：当主力渠道吐出一个非 200，系统是原地不动、换接口格式、还是换一条渠道。<strong>错的表不会报错，只会静默地把任务拖死。</strong></p>
+    <p>先看两张表。第一张是「不换渠道」的白名单，命中就立刻抛：</p>
+    <div class="code">
+      <div class="code-bar"><b>src/provider-service.js</b><span>generateImage · 不降级名单</span></div>
+<pre><span class="c">// 渲染失败/参数错误不降级;网络与上游错误时自动切到下一个含生图模型的渠道重试一次</span>
+<span class="k">if</span> (!failover || [
+  <span class="s">'PROVIDER_REQUIRED'</span>, <span class="s">'MODEL_REQUIRED'</span>, <span class="s">'PROVIDER_NOT_CONFIGURED'</span>,
+  <span class="s">'IMAGE_TOO_LARGE'</span>, <span class="s">'IMAGE_RESPONSE_UNSUPPORTED'</span>, <span class="s">'IMAGE_MIME_INVALID'</span>,
+  <span class="s">'IMAGE_URL_INVALID'</span>, <span class="s">'PROVIDER_AUTH_FAILED'</span>
+].includes(error?.code)) <span class="k">throw</span> error;</pre>
+    </div>
+    <p>理由是分类：前三个是「你根本没配好」，换渠道也没用；中间四个是「拿到的东西不能用」，换渠道可能有救、但更可能只是把同一个问题再演一遍；最后一个是「钥匙不对」，换门也没用。</p>
+    <p>第二张表是「先试 chat 型生图」的条件：</p>
+    <div class="code">
+      <div class="code-bar"><b>src/provider-service.js</b><span>generateImageOnce · chat 降级</span></div>
+<pre><span class="k">if</span> (!response.ok) {
+  <span class="k">const</span> upstream = <span class="k">await</span> upstreamError(response, <span class="s">'IMAGE_GENERATION_FAILED'</span>, <span class="s">'图片生成失败'</span>);
+  <span class="c">// 鉴权错误换端点也没用，直接抛；其余错误（404/500 端点无路由、渠道缺失等）降级到 chat 型生图</span>
+  <span class="k">if</span> ([<span class="n">401</span>, <span class="n">402</span>, <span class="n">403</span>].includes(response.status)) <span class="k">throw</span> upstream;
+  <span class="k">if</span> (!mask) {
+    <span class="k">try</span> {
+      <span class="k">const</span> chatResult = <span class="k">await</span> generateImageViaChat({ <span class="c">/* … */</span> });
+      <span class="k">if</span> (chatResult) <span class="k">return</span> chatResult;
+    } <span class="k">catch</span> {
+      <span class="c">// 降级失败时以原始 /images 错误为准，避免掩盖真实原因</span>
+    }
+  }
+  <span class="k">throw</span> upstream;
+}</pre>
+    </div>
+    <p>这段代码值得逐句读。注意三件事：</p>
+    <ol>
+      <li><strong>有蒙版就不试 chat。</strong>局部重绘传的是一个 PNG 蒙版，chat 接口没有地方放它。与其发一个没有蒙版的请求得到一张完全不对的图，不如老实失败。</li>
+      <li><strong>chat 失败时抛的是原始错误。</strong>不是 chat 的错误。因为用户关心的是「为什么我的 /images 调用没成」，而不是「备用方案也没成」——后者只是信息，前者才是原因。</li>
+      <li><strong>这段注释和实际行为有一处偏差。</strong>注释说鉴权错误「直接抛」，但抛出去的是一个 <code>IMAGE_GENERATION_FAILED</code>，它并不在上一张白名单里。所以 401 依然会被外层接住、换一个渠道再试。真正不做的是 chat 降级。<em>读代码时，注释描述意图，错误码决定行为；两者不一致时，以错误码为准。</em></li>
+    </ol>
+
+    <h3>为什么需要一个 chat 降级</h3>
+    <p>因为有一类中转站，只把生图模型挂在 <code>/chat/completions</code> 上。<code>/v1/images/generations</code> 要么 404，要么返回 200 但 <code>data</code> 是空的。这类站的前端就是把图当消息发出来的，所以图片藏在消息里——可能是 <code>message.images[].image_url.url</code>，可能是 Markdown 里的 <code>![](data:image/png;base64,…)</code>，可能是一段裸的 <code>https://…png</code>。</p>
+    <p>解析器四种都认，按顺序试：结构化字段 → Markdown 图片 → 内联 data URI → 裸 URL。取到之后仍然走同一套 mime 与大小检查。降级的代价是丢参数：<code>seed</code> 和 <code>guidance_scale</code> 没法经 chat 传递，尺寸只能作为一句话附加在提示词后面（「图片输出尺寸约 1024×1024」）。这是有损降级，代码里也写明了「尽力而为」。</p>
+
+    <h3>一张表，七种结局</h3>
+    <p>把两张表合起来，就得到一个有点残酷的矩阵。假设每次都备了另一条健康渠道：</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>上游返回</th><th>试 chat？</th><th>抛出的码</th><th>换渠道？</th><th>用户看到</th></tr></thead>
+        <tbody>
+          <tr><td class="num">401 / 402 / 403</td><td>否</td><td><code>IMAGE_GENERATION_FAILED</code></td><td><b>会</b></td><td>可能被备用渠道救回</td></tr>
+          <tr><td class="num">404 / 405</td><td>是（无蒙版）</td><td><code>IMAGE_GENERATION_FAILED</code></td><td><b>会</b></td><td>可能先被 chat 救、再被渠道救</td></tr>
+          <tr><td class="num">429 / 500</td><td>是（无蒙版）</td><td><code>IMAGE_GENERATION_FAILED</code></td><td><b>会</b></td><td>同上</td></tr>
+          <tr><td class="num">200 但无图</td><td>是（无蒙版）</td><td><code>IMAGE_RESPONSE_UNSUPPORTED</code></td><td><b>不会</b></td><td>直接失败，白名单拦住</td></tr>
+          <tr><td class="num">200，图 &gt; 30MB</td><td>—</td><td><code>IMAGE_TOO_LARGE</code></td><td><b>不会</b></td><td>直接失败，尺寸是硬约束</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>最后一行是这张表里唯一一个反直觉的洞：<strong>「返回 200 但没有图片」不会触发换渠道。</strong>因为它被判成 <code>IMAGE_RESPONSE_UNSUPPORTED</code>——「你选的这个模型不支持这种返回」，属于配置问题，不属于网络问题。可现实中它更常见的原因是「这条渠道今天就是不给你图」。这个判定的代价是：那条渠道会一直占着主力位置，而每一次生成都失败在同一行代码上。</p>
+    <div class="pull">降级的价值不在「多试一次」，而在<b>把错误分对类</b>。分错的后果不是崩，是稳定地错——每一次都失败得很干净，让你以为这就是世界的极限。</div>
+
+    <h3>十分钟一次的巡检</h3>
+    <p>上面那条路是「请求内的降级」。系统还有一条「请求外的」：定时巡检。</p>
+    <p>每 10 分钟（第一次在启动后 30 秒），服务端会把 <code>roles</code> 里登记过的每个角色拿出来，向对应渠道发一次 <code>GET {base}/models</code>，8 秒超时。如果<strong>生图主力</strong>检查失败，且没有被锁定，就从历史体检结果里挑「生图模型最多」的健康渠道接管，模型取它的第一个生图模型，写回 <code>roles</code>，并把这条切换记进事件列表（最多留 20 条）。</p>
+    <p>这套逻辑保守得近乎笨拙：只看 <code>/models</code> 通不通，只看模型数量最多，不看延迟、不看成功率、不看它到底能不能出图。但它有一个巨大的好处——无状态、可解释、失败时不会做出更坏的猜测。在私人工具里，「可解释的笨办法」永远优于「不可解释的聪明办法」。</p>
+    <div class="note"><b>它抓不到什么：</b>今天我撞的那个 429，巡检一辈子都发现不了。<code>/models</code> 返回 200，清单一切正常，只是「你同时发三个我就不干活」。这类「活着但拒绝服务」的渠道，只能靠请求内的 429 处理，或者靠人去把并发调成 1。巡检是探活，不是探服务质量。</div>
+
+    <figure class="fig">
+      <div class="frame"><img src="assets/art/restore.webp" alt="深色木桌上摆着一台老式收音机，调谐指针停在刻度上，背景虚化处有夜景城市与一台发着青光的电脑屏幕" width="1024" height="1024"/></div>
+      <figcaption><b>FIG. 04</b>巡检像调台：你只能确认这个频率有声音，不能确认它今天播的是不是你想听的节目。</figcaption>
+    </figure>
+
+    <h3>自己走一遍这张表</h3>
+    <p>下面的小样把两条降级链摊开：内层的 chat 降级、外层的换渠道。切换返回码、开关蒙版与备用渠道，看每一步的判决。特别建议看一眼「200 但无图」那一格——那是这张表里唯一的死路。</p>
+  </div>
+
+  <div class="demo" id="demo-fallback">
+    <div class="demo-head">
+      <span class="demo-tag">DEMO 03</span>
+      <span class="demo-title">降级链 <span class="hint">换一个返回码，看这条路走不走得通</span></span>
+    </div>
+    <div class="demo-body">
+      <div class="controls">
+        <div class="ctl" style="min-width:260px">
+          <label>主力渠道 /images 返回</label>
+          <div class="seg" id="fb-status">
+            <button type="button" data-s="401">401</button>
+            <button type="button" data-s="402">402</button>
+            <button type="button" data-s="403">403</button>
+            <button type="button" data-s="404">404</button>
+            <button type="button" data-s="429" aria-pressed="true">429</button>
+            <button type="button" data-s="500">500</button>
+            <button type="button" data-s="200">200空</button>
+          </div>
+        </div>
+        <label class="switch"><input id="fb-mask" type="checkbox"/>带蒙版（局部重绘）</label>
+        <label class="switch"><input id="fb-backup" type="checkbox" checked/>有备用渠道</label>
+        <label class="switch"><input id="fb-chatfails" type="checkbox" checked/>chat 接口也拿不到图</label>
+      </div>
+      <div class="chain" id="fb-chain"></div>
+      <div class="verdict-box" id="fb-verdict"></div>
+    </div>
+    <div class="demo-foot"><b>依据</b>：<code>generateImageOnce</code> 内层判 401/402/403 跳过 chat；<code>!mask</code> 才试 chat；外层 <code>generateImage</code> 用错误码白名单决定是否换渠道。备用渠道取「生图模型数最多」的那一条，只重试一次。</div>
+  </div>
+</section>

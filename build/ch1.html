@@ -1,0 +1,122 @@
+<section class="chapter" id="ch1">
+  <div class="ch-head">
+    <div class="ch-num">SCENE<b>01</b></div>
+    <div class="ch-title">
+      <h2>一行提示词背后</h2>
+      <p>用户在创作页按下「生成」，到图库里出现一张能翻页的缩略图，中间隔着十六个动作。模型只负责其中一个。</p>
+    </div>
+  </div>
+  <div class="ch-body">
+    <p class="lede">所有生图产品的演示都长一个样：输入一句话，等一下，一张图从模糊变清晰。这个等的过程被打包成一个进度条，于是没人知道里面发生了什么。可一旦你自己维护这套东西，进度条就会开始骗人——它涨到 90% 停了三十秒，你不知道是在排队、在等上游、在下载，还是上游其实早就返回了、只是你的磁盘写不动。</p>
+    <p>「画境」的第一版只有一条通路：前端把提示词和一个渠道 ID 发到 <code>POST /api/generations</code>，服务端调一次 <code>/v1/images/generations</code>，把 base64 解出来存成文件，返回。不到两百行。它能用，但只在你恰好有一个健康渠道、一次只点一张、网络不抖的时候能用。</p>
+    <p>今天这个版本有 30 条 API 路由、11,329 行前后端 JS。多出来的部分几乎全是「不顺利的时候怎么办」。把一次点按摊开，是这样十六个动作：</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>阶段</th><th>动作</th><th>落在哪</th></tr></thead>
+        <tbody>
+          <tr><td class="num">入参</td><td>校验提示词非空；解析这次用哪个渠道、哪个模型、什么尺寸</td><td><code>server.js</code></td></tr>
+          <tr><td class="num">入参</td><td>参考图已先一步落盘到 <code>data/references/</code>，这里只取文件名</td><td><code>store</code></td></tr>
+          <tr><td class="num">记账</td><td>按 <code>n</code> 拆成 N 条记录，逐条 <code>status:'queued'</code>，写 <code>queuedAt</code></td><td><code>store</code></td></tr>
+          <tr><td class="num">排队</td><td>入队，用 <code>queuedGenerationIds</code> 去重，<code>setImmediate</code> 触发下一次排空</td><td><code>drainGenerationQueue</code></td></tr>
+          <tr><td class="num">排队</td><td>检查并发槽：<code>runningGenerations &lt; generationConcurrency</code> 才放行</td><td><code>server.js</code></td></tr>
+          <tr><td class="num">排队</td><td>改 <code>running</code>，写 <code>startedAt</code> 与 <code>queueDurationMs</code></td><td><code>store</code></td></tr>
+          <tr><td class="num">调用</td><td>取渠道、取模型、把负面提示词拼进正文</td><td><code>provider-service</code></td></tr>
+          <tr><td class="num">调用</td><td>有参考图走 <code>/images/edits</code>（multipart），没有走 <code>/images/generations</code></td><td><code>fetchWithTimeout</code></td></tr>
+          <tr><td class="num">调用</td><td>超时、代理、认证头，全部由渠道级配置决定</td><td><code>http-transport</code></td></tr>
+          <tr><td class="num">解码</td><td><code>b64_json</code> 直接解码；<code>url</code> 则二次下载并验 mime</td><td><code>provider-service</code></td></tr>
+          <tr><td class="num">降级</td><td>无图字段 → 尝试 chat 型生图；上游挂了 → 换一个渠道再试一次</td><td><code>generateImage</code></td></tr>
+          <tr><td class="num">落盘</td><td>文件名用 <code>crypto.randomUUID()</code>，先写临时文件再 <code>rename</code></td><td><code>atomicWrite</code></td></tr>
+          <tr><td class="num">落盘</td><td>记录改 <code>completed</code>，写入 <code>media[]</code>、耗时、来源渠道</td><td><code>store</code></td></tr>
+          <tr><td class="num">收尾</td><td>预热 640px WebP 缩略图；sharp 不可用就静默降级</td><td><code>thumbnail-service</code></td></tr>
+          <tr><td class="num">读取</td><td>前端轮询列表，默认只拿缩略图，点开才取原图</td><td><code>gallery</code></td></tr>
+          <tr><td class="num">读取</td><td>搜索、收藏、复制提示词、同款生成、打包下载</td><td><code>zip-service</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="fig">
+      <div class="frame">
+        <svg viewBox="0 0 960 300" role="img" aria-label="生图流水线：客户端、接口、队列、渠道、磁盘与图库五段，模型只是其中一段">
+          <rect width="960" height="300" fill="#080706"/>
+          <defs>
+            <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M0 0 L10 5 L0 10 z" fill="#6e6659"/>
+            </marker>
+          </defs>
+          <g font-family="ui-monospace,Consolas,monospace" font-size="10.5" fill="#948b7e">
+            <text x="24" y="28">点击</text>
+            <text x="168" y="28">HTTP</text>
+            <text x="352" y="28">状态机</text>
+            <text x="540" y="28">网络</text>
+            <text x="712" y="28">磁盘</text>
+            <text x="850" y="28">读取</text>
+          </g>
+          <g>
+            <rect x="18" y="44" width="108" height="58" rx="4" fill="#151210" stroke="#2a231a"/>
+            <text x="34" y="68" fill="#f0e8da" font-family="ui-monospace,monospace" font-size="12">创作页</text>
+            <text x="34" y="86" fill="#6e6659" font-family="ui-monospace,monospace" font-size="9.5">prompt / size / n</text>
+
+            <rect x="150" y="44" width="150" height="58" rx="4" fill="#151210" stroke="#2a231a"/>
+            <text x="166" y="68" fill="#f0e8da" font-family="ui-monospace,monospace" font-size="12">POST /generations</text>
+            <text x="166" y="86" fill="#e6a33b" font-family="ui-monospace,monospace" font-size="9.5">一条记录 = 一个任务</text>
+
+            <rect x="324" y="38" width="164" height="70" rx="4" fill="#151210" stroke="#e6a33b" stroke-opacity=".45"/>
+            <text x="340" y="60" fill="#f0e8da" font-family="ui-monospace,monospace" font-size="12">队列 · 并发槽</text>
+            <text x="340" y="78" fill="#e6a33b" font-family="ui-monospace,monospace" font-size="9.5">queued → running</text>
+            <text x="340" y="94" fill="#6e6659" font-family="ui-monospace,monospace" font-size="9.5">默认 2，上限 8</text>
+
+            <rect x="512" y="38" width="164" height="70" rx="4" fill="#151210" stroke="#79b3a6" stroke-opacity=".5"/>
+            <text x="528" y="60" fill="#f0e8da" font-family="ui-monospace,monospace" font-size="12">渠道 /v1/images</text>
+            <text x="528" y="78" fill="#79b3a6" font-family="ui-monospace,monospace" font-size="9.5">b64 或 url</text>
+            <text x="528" y="94" fill="#6e6659" font-family="ui-monospace,monospace" font-size="9.5">超时 180s · 代理可选</text>
+
+            <rect x="700" y="38" width="140" height="70" rx="4" fill="#151210" stroke="#2a231a"/>
+            <text x="716" y="60" fill="#f0e8da" font-family="ui-monospace,monospace" font-size="12">atomicWrite</text>
+            <text x="716" y="78" fill="#6e6659" font-family="ui-monospace,monospace" font-size="9.5">tmp → rename</text>
+            <text x="716" y="94" fill="#6e6659" font-family="ui-monospace,monospace" font-size="9.5">db.json 原子快照</text>
+
+            <rect x="864" y="44" width="78" height="58" rx="4" fill="#151210" stroke="#2a231a"/>
+            <text x="876" y="68" fill="#f0e8da" font-family="ui-monospace,monospace" font-size="12">图库</text>
+            <text x="876" y="86" fill="#6e6659" font-family="ui-monospace,monospace" font-size="9.5">640px 缩略</text>
+
+            <path d="M126 73 H146" stroke="#6e6659" marker-end="url(#ar)"/>
+            <path d="M300 73 H320" stroke="#6e6659" marker-end="url(#ar)"/>
+            <path d="M488 73 H508" stroke="#6e6659" marker-end="url(#ar)"/>
+            <path d="M676 73 H696" stroke="#6e6659" marker-end="url(#ar)"/>
+            <path d="M840 73 H860" stroke="#6e6659" marker-end="url(#ar)"/>
+          </g>
+          <g font-family="ui-monospace,Consolas,monospace" font-size="9.5" fill="#6e6659">
+            <text x="18" y="140">失败发生在任意一段，都会往回走一层：</text>
+            <text x="18" y="160" fill="#cf5b45">渠道 500 → 换一条渠道</text>
+            <text x="212" y="160" fill="#cf5b45">渠道 404 / 空 data → 换 chat 型接口</text>
+            <text x="500" y="160" fill="#cf5b45">写盘失败 → 任务标 failed，不落半张图</text>
+            <text x="18" y="182" fill="#79b3a6">而模型自己，只占「渠道」这一格。</text>
+          </g>
+          <g>
+            <rect x="18" y="204" width="924" height="1" fill="#2a231a"/>
+            <text x="18" y="228" fill="#948b7e" font-family="ui-monospace,monospace" font-size="9.5">同一套骨架被复用到四处：</text>
+            <text x="18" y="248" fill="#cfc4b2" font-family="ui-monospace,monospace" font-size="10">文生图 / 参考图编辑（/images/edits） / 局部重绘（带蒙版） / 批量矩阵（N 条记录 × 各自排队）</text>
+            <text x="18" y="270" fill="#6e6659" font-family="ui-monospace,monospace" font-size="9.5">视频工坊是另一条异步链：提交拿 remoteTaskId → 轮询 → 下载成片，最长等 15 分钟。</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption><b>FIG. 01</b>一次生成的五段式骨架。模型在第三段；剩下的四段，才是这个项目一万多行代码的去处。</figcaption>
+    </div>
+
+    <h3>为什么不是一个接口搞定</h3>
+    <p>因为每一段都会独立失败，而失败需要不同的反应。把它们塞进一个函数，你就只能统一抛一个「生成失败」，然后永远不知道是谁的错：是渠道挂了、是 key 过期、是模型名拼错、是上游返回了 SVG、还是磁盘满了。</p>
+    <p>拆开之后，错误就有了名字。这个项目里定义了几十个错误码，全部带 HTTP 状态：<code>PROVIDER_NOT_FOUND</code> 是 404、<code>API_KEY_REQUIRED</code> 是 400、<code>PROVIDER_AUTH_FAILED</code> 是 401、<code>IMAGE_MIME_INVALID</code> 是 502、<code>TASK_NOT_CANCELLABLE</code> 是 409。前端不需要理解上游的方言，只看这几个码就能给出人话提示。</p>
+    <div class="note"><b>一个副作用：</b>错误码变成了降级逻辑的开关。第 5 章会讲，哪些码值得换渠道重试、哪些必须立刻停手，全靠这张码表决定。先有名字，才谈得上选择。</div>
+
+    <h3>状态的三种时态</h3>
+    <p>一条生成记录只有四个状态：<code>queued</code>、<code>running</code>、<code>completed</code>、<code>failed</code>；加上用户的意志，多一个 <code>cancelled</code>。看起来简单，但「取消」在这套流水线里不是一个布尔量，而是三个不同时刻的三件不同的事：</p>
+    <ul>
+      <li><strong>排队时取消</strong>：直接出队，任务从未花过上游一分钱。</li>
+      <li><strong>运行中取消</strong>：落 <code>cancelled</code>，但 HTTP 请求不会中断——它继续跑完，回来后结果被丢弃，不入库。上游的钱已经花了。</li>
+      <li><strong>结果已回但未落盘时取消</strong>：同样丢弃，因为检查发生在写盘之前。</li>
+    </ul>
+    <p>三种时态的差别，用户看不到。他们看到的只是「点了取消，图没了」。但账本上必须留下差别，因为第一种是零成本，后两种是已付费。这套系统的所有诚实，都建立在这种「用户看不见、但账上记着」的区分上。</p>
+    <div class="pull">生图工具最容易骗人的地方，是它把「排队」「等待」「失败重试」全画成同一个转圈。<b>而工程的起点，是让这圈转得有名有姓。</b></div>
+  </div>
+</section>

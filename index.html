@@ -1,0 +1,1761 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="color-scheme" content="dark"/>
+<meta name="theme-color" content="#0c0a09"/>
+<link rel="preload" href="assets/fonts/wenkai-regular.woff2" as="font" type="font/woff2" crossorigin/>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='4' fill='%230c0a09'/%3E%3Crect x='4' y='6' width='16' height='12' rx='1.6' fill='none' stroke='%23e6a33b' stroke-width='1.3'/%3E%3Ccircle cx='12' cy='11' r='2.2' fill='%2379b3a6'/%3E%3Cpath d='M7 15.2h10' stroke='%23e6a33b' stroke-width='.9' opacity='.7'/%3E%3C/svg%3E"/>
+<meta name="description" content="等一张图显影：一个 AI 生图工作台的解剖报告。渠道体检、队列预算、降级链与元数据账本——从一次点按到一张可复查的图，附四枚可玩小样。"/>
+<meta name="author" content="StarrySea1412"/>
+<meta property="og:title" content="等一张图显影 · 造物手记 VOL.06"/>
+<meta property="og:description" content="生图工具都在比谁的模型多。可真用起来，先坏掉的是那条把「一次点按」翻译成「排队、降级、落盘、记账」的流水线。"/>
+<meta property="og:type" content="article"/>
+<meta property="og:image" content="assets/art/hero.webp"/>
+<title>等一张图显影 · 造物手记 VOL.06</title>
+<style>
+/* 《等一张图显影》· 暗房主题
+   纸不是纸，是一间只开安全灯的房间：所有东西都偏琥珀色，
+   因为红光是唯一不会让相纸提前曝光的颜色。 */
+@font-face{font-family:"LXGW WenKai";src:url("assets/fonts/wenkai-regular.woff2") format("woff2");font-weight:300 599;font-style:normal;font-display:swap}
+@font-face{font-family:"LXGW WenKai";src:url("assets/fonts/wenkai-medium.woff2") format("woff2");font-weight:600 900;font-style:normal;font-display:swap}
+:root{
+  --bg:#0c0a09;--panel:#151210;--panel-2:#1b1714;--screen:#080706;
+  --ink:#f0e8da;--ink-soft:#cfc4b2;--muted:#948b7e;--faint:#6e6659;
+  --line:#2a231a;--line-soft:#1f1a15;
+  --amber:#e6a33b;--amber-deep:#b97f22;--amber-soft:rgba(230,163,59,.13);
+  --red:#cf5b45;--red-deep:#a4412f;--red-soft:rgba(207,91,69,.13);
+  --teal:#79b3a6;--teal-soft:rgba(121,179,166,.12);
+  --paper:#f5ecdb;
+  --serif:"LXGW WenKai","Songti SC","STSong","Noto Serif CJK SC",serif;
+  --sans:"LXGW WenKai",-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,"SFMono-Regular",Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:28px}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.95;-webkit-font-smoothing:antialiased;text-spacing:ideograph-alpha;
+  background-image:radial-gradient(1100px 560px at 12% -6%,rgba(230,163,59,.10),transparent 62%),radial-gradient(900px 480px at 88% 8%,rgba(121,179,166,.045),transparent 60%)}
+::selection{background:rgba(230,163,59,.32);color:#fff}
+a{color:var(--teal);text-underline-offset:4px;text-decoration-thickness:1px}
+a:hover{color:var(--amber)}
+button,a,input,select,tspan{touch-action:manipulation}
+button{cursor:pointer;color:inherit;font:inherit}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--amber);outline-offset:3px}
+img{display:block;max-width:100%;height:auto}
+p{margin:0 0 1.25em}
+h1,h2,h3,h4{line-height:1.45;text-wrap:balance;margin:0}
+h1,h2,h3{font-family:var(--serif)}
+strong{font-weight:650;color:#fff}
+code{font-family:var(--mono);font-size:.86em;background:var(--teal-soft);color:#cfe6e0;padding:.12em .38em;border-radius:3px;overflow-wrap:anywhere}
+em{font-style:normal;color:var(--amber)}
+.progress{position:fixed;inset:0 auto auto 0;height:3px;width:100%;background:linear-gradient(90deg,var(--amber),var(--red));transform:scaleX(0);transform-origin:left;z-index:60;pointer-events:none}
+.wrap{max-width:1180px;margin:auto;padding-inline:36px}
+.prose{max-width:768px;margin-inline:auto}
+
+/* ── masthead ─────────────────────────────── */
+.masthead{display:flex;align-items:center;justify-content:space-between;gap:18px;padding-block:24px 18px;border-bottom:1px solid var(--line);font-size:12px;letter-spacing:.1em;color:var(--muted)}
+.brand{display:flex;align-items:center;gap:11px;font-weight:650;color:var(--ink)}
+.brand-mark{width:24px;height:24px;display:grid;place-items:center;border:1px solid var(--line);border-radius:4px;background:var(--panel)}
+.brand-mark svg{width:15px;height:15px;display:block}
+.brand small{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--amber);font-weight:600}
+.edition{font-family:var(--mono);font-size:11px;letter-spacing:.08em;display:flex;gap:14px;align-items:center}
+.edition .rec{display:inline-flex;align-items:center;gap:7px;color:var(--amber)}
+.rec-dot{width:7px;height:7px;border-radius:50%;background:var(--amber);box-shadow:0 0 0 0 rgba(230,163,59,.55);animation:pulse 2.6s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(230,163,59,.5)}70%{box-shadow:0 0 0 9px rgba(230,163,59,0)}100%{box-shadow:0 0 0 0 rgba(230,163,59,0)}}
+
+/* ── hero ─────────────────────────────────── */
+.hero{padding-block:64px 44px;display:grid;grid-template-columns:1.02fr .98fr;gap:54px;align-items:center}
+.eyebrow{display:inline-flex;align-items:center;gap:10px;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;color:var(--muted);margin:0 0 26px;background:var(--panel);border:1px solid var(--line);padding:7px 14px 7px 8px;border-radius:3px}
+.eyebrow span{color:var(--amber);letter-spacing:.16em;font-weight:700;padding-right:11px;border-right:1px solid var(--line)}
+.hero h1{font-size:clamp(44px,5.1vw,72px);font-weight:800;line-height:1.12;letter-spacing:-.04em;margin:0 0 22px}
+.hero h1 em{color:var(--amber);white-space:nowrap}
+.hero h1 .sub{display:block;font-size:.38em;font-weight:400;letter-spacing:.02em;color:var(--ink-soft);margin-top:15px;line-height:1.7}
+.dek-wrap{margin:0 0 28px;max-width:560px;border-left:3px solid var(--amber);padding-left:20px}
+.dek-tag{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--amber);letter-spacing:.09em;margin:0 0 9px}
+.dek{font-size:16.5px;line-height:1.92;color:var(--ink-soft);margin:0}
+.hero-meta{display:flex;flex-wrap:wrap;gap:8px}
+.pill{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:6px 11px;background:var(--panel)}
+.pill b{color:var(--ink);font-weight:650}
+
+/* hero print */
+.art{margin:0;position:relative}
+.sheet{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:26px 20px;box-shadow:0 30px 70px -34px rgba(0,0,0,.95)}
+.sheet::before,.sheet::after{content:"";position:absolute;top:8px;bottom:8px;width:9px;background-image:radial-gradient(circle at 50% 50%,#0a0908 0 2.6px,transparent 2.8px);background-size:9px 15px;opacity:.85}
+.sheet::before{left:5px}
+.sheet::after{right:5px}
+.sheet-img{position:relative;overflow:hidden;border-radius:1px;background:var(--screen);box-shadow:inset 0 0 0 1px rgba(0,0,0,.6)}
+.sheet-img img{width:100%;aspect-ratio:3/2;object-fit:cover;filter:saturate(.94) contrast(1.04)}
+.sheet-img::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(230,163,59,.05),transparent 40%,rgba(6,5,4,.55));pointer-events:none}
+.corner{position:absolute;width:16px;height:16px;border-color:rgba(245,236,219,.4);border-style:solid;border-width:0;pointer-events:none;z-index:2}
+.corner.tl{top:12px;left:12px;border-top-width:1px;border-left-width:1px}
+.corner.tr{top:12px;right:12px;border-top-width:1px;border-right-width:1px}
+.corner.bl{bottom:12px;left:12px;border-bottom-width:1px;border-left-width:1px}
+.corner.br{bottom:12px;right:12px;border-bottom-width:1px;border-right-width:1px}
+.exif-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;font-family:var(--mono);font-size:10px;letter-spacing:.07em;color:var(--faint);padding:10px 2px 0}
+.exif-bar .hot{color:var(--amber)}
+.art figcaption{font-size:11.5px;color:var(--faint);margin-top:11px;line-height:1.7;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-family:var(--mono);letter-spacing:.03em}
+.art figcaption b{color:var(--teal);font-weight:600}
+
+/* stats strip */
+.stats{border-block:1px solid var(--line);background:rgba(21,18,16,.62)}
+.stats-inner{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line)}
+.stat{background:var(--bg);padding:18px 20px}
+.stat b{display:block;font-family:var(--mono);font-size:22px;letter-spacing:-.02em;color:var(--ink);line-height:1.3}
+.stat b span{font-size:11px;color:var(--faint);letter-spacing:.04em;margin-left:3px}
+.stat small{display:block;font-size:11px;color:var(--muted);letter-spacing:.04em;margin-top:3px}
+
+/* ── opening / toc ────────────────────────── */
+.opening{padding-block:56px 22px}
+.lead{font-size:19.5px;line-height:1.98;color:var(--ink)}
+.scope{font-size:12.5px;color:var(--muted);border-top:1px solid var(--line);padding-top:15px;margin-top:30px;font-family:var(--mono);line-height:1.85}
+.toc-head{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--line);padding-bottom:10px;margin:34px 0 0;font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--faint)}
+.toc{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-top:0;margin:0 0 60px}
+.toc a{background:var(--panel);padding:15px 18px;text-decoration:none;color:var(--ink);display:grid;grid-template-columns:52px 1fr;gap:12px;align-items:baseline;transition:background .18s}
+.toc a:hover{background:var(--panel-2);color:#fff}
+.toc a i{font-family:var(--mono);font-style:normal;font-size:11px;color:var(--amber);letter-spacing:.04em}
+.toc a span{font-size:14px}
+.toc a small{display:block;font-size:11px;color:var(--faint);margin-top:2px;line-height:1.6}
+
+/* ── chapters ─────────────────────────────── */
+.chapter{padding-block:54px 20px;border-top:1px solid var(--line)}
+.ch-head{display:grid;grid-template-columns:92px 1fr;gap:22px;align-items:start;margin:0 auto 34px;max-width:980px}
+.ch-num{font-family:var(--mono);font-size:13px;color:var(--amber);letter-spacing:.08em;padding-top:14px;border-top:2px solid var(--amber);line-height:1.5}
+.ch-num b{display:block;font-size:34px;color:var(--ink);letter-spacing:-.02em;font-weight:700;line-height:1.1}
+.ch-title h2{font-size:clamp(29px,3.4vw,43px);font-weight:750;letter-spacing:-.025em;line-height:1.25}
+.ch-title p{color:var(--muted);font-size:14px;margin:10px 0 0;line-height:1.8;max-width:640px}
+.ch-body{max-width:768px;margin-inline:auto}
+.ch-body h3{font-size:22px;font-weight:700;margin:44px 0 14px;letter-spacing:-.01em;padding-left:14px;border-left:3px solid var(--teal)}
+.ch-body h4{font-size:16px;font-weight:650;margin:28px 0 8px;color:var(--teal)}
+.ch-body ul,.ch-body ol{padding-left:1.35em;margin:0 0 1.3em}
+.ch-body li{margin:.42em 0}
+.ch-body li::marker{color:var(--amber)}
+.lede{font-size:17px;color:var(--ink-soft);line-height:1.95}
+.pull{border-left:3px solid var(--amber);background:linear-gradient(90deg,var(--amber-soft),transparent 70%);padding:18px 22px;margin:30px 0;font-family:var(--serif);font-size:19px;line-height:1.85;color:var(--ink)}
+.pull b{color:#fff;font-weight:700}
+.note{font-size:13px;color:var(--muted);border-left:1px solid var(--line);padding-left:14px;margin:22px 0;line-height:1.85}
+.note b{color:var(--ink-soft)}
+.fig{margin:34px auto;position:relative;left:50%;transform:translateX(-50%);width:min(940px,calc(100vw - 72px))}
+.fig .frame{border:1px solid var(--line);background:var(--panel);padding:8px;border-radius:4px}
+.fig img{width:100%;border-radius:2px}
+.fig figcaption{font-family:var(--mono);font-size:11.5px;color:var(--faint);letter-spacing:.03em;margin-top:10px;line-height:1.75;display:flex;gap:10px;align-items:baseline}
+.fig figcaption b{color:var(--amber);font-weight:600;flex:none}
+
+/* code */
+.code{margin:26px 0;border:1px solid var(--line);border-radius:4px;background:#0a0806;overflow:hidden}
+.code-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid var(--line-soft);font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--faint);background:var(--panel)}
+.code-bar b{color:var(--teal);font-weight:600}
+.code pre{margin:0;padding:16px 17px 18px;overflow-x:auto;font-family:var(--mono);font-size:12.6px;line-height:1.78;color:#cbd5cf;tab-size:2}
+.code pre .c{color:#6e6659}
+.code pre .k{color:#e08a72}
+.code pre .s{color:#a9c4a0}
+.code pre .n{color:var(--amber)}
+.code pre .f{color:#9dbccc}
+.code pre .hl{background:rgba(230,163,59,.13);display:inline-block;width:100%}
+
+/* formula */
+.formula{margin:28px 0;border:1px solid var(--line);border-radius:4px;background:var(--panel);padding:20px 22px;text-align:center}
+.formula .eq{font-family:var(--mono);font-size:clamp(13px,1.8vw,18px);letter-spacing:.01em;color:var(--amber);line-height:1.9}
+.formula .eq var{font-style:italic;color:var(--ink)}
+.formula small{display:block;font-family:var(--mono);font-size:10.5px;color:var(--faint);letter-spacing:.04em;margin-top:9px;line-height:1.7}
+.formula .why{font-size:13px;color:var(--muted);margin:12px auto 0;max-width:600px;line-height:1.8;text-align:left}
+
+/* table */
+.tablewrap{overflow-x:auto;margin:26px 0;border:1px solid var(--line);border-radius:4px}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:560px}
+th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line-soft);vertical-align:top;line-height:1.7}
+th{background:var(--panel);font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;color:var(--muted);font-weight:600}
+tr:last-child td{border-bottom:0}
+td b{color:#fff;font-weight:650}
+td code{font-size:12px}
+.num{font-family:var(--mono);font-size:12.5px;color:var(--amber);white-space:nowrap}
+
+/* record card */
+.rec-card{max-width:560px;margin:30px auto;border:1px solid var(--line);border-radius:5px;background:var(--panel);overflow:hidden}
+.rec-card .rc-top{display:flex;justify-content:space-between;align-items:center;padding:9px 13px;border-bottom:1px solid var(--line-soft);font-family:var(--mono);font-size:10.5px;color:var(--faint);letter-spacing:.05em}
+.rec-card .rc-top b{color:var(--amber);font-weight:600}
+.rec-card .rc-body{padding:14px 16px 15px}
+.rec-card .rc-row{display:grid;grid-template-columns:88px 1fr;gap:10px;padding:5px 0;border-bottom:1px dashed var(--line-soft);font-size:13px}
+.rec-card .rc-row:last-child{border-bottom:0}
+.rec-card .rc-row span{font-family:var(--mono);font-size:10.5px;color:var(--faint);letter-spacing:.04em;padding-top:3px}
+.rec-card .rc-row b{color:var(--ink);font-weight:500;font-family:var(--mono);font-size:12px;line-height:1.75}
+.tag{font-family:var(--mono);font-size:10px;letter-spacing:.05em;padding:3px 8px;border-radius:2px;border:1px solid var(--line);color:var(--muted);display:inline-block}
+.tag.ok{color:var(--teal);border-color:rgba(121,179,166,.35);background:var(--teal-soft)}
+.tag.warn{color:var(--amber);border-color:rgba(230,163,59,.35);background:var(--amber-soft)}
+.tag.bad{color:#e88b7b;border-color:rgba(207,91,69,.35);background:var(--red-soft)}
+
+/* ── demos ────────────────────────────────── */
+.demo{max-width:1000px;margin:46px auto;border:1px solid var(--line);border-radius:6px;background:var(--panel);overflow:hidden;box-shadow:0 22px 55px -36px #000}
+.demo-head{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:13px 18px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,var(--panel-2),var(--panel));flex-wrap:wrap}
+.demo-tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;color:var(--amber);font-weight:700}
+.demo-title{font-size:15px;font-weight:650;letter-spacing:.01em;margin-left:auto;display:flex;align-items:center;gap:9px}
+.demo-title .hint{font-family:var(--mono);font-size:10px;color:var(--faint);font-weight:400;letter-spacing:.04em}
+.demo-body{padding:20px 20px 18px}
+.controls{display:flex;flex-wrap:wrap;gap:18px 26px;align-items:flex-end;padding-bottom:16px;border-bottom:1px solid var(--line-soft);margin-bottom:16px}
+.controls.stacked{display:grid;grid-template-columns:1fr 1fr;gap:16px 30px}
+.ctl{min-width:150px;flex:1}
+.ctl label{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--muted);margin-bottom:7px}
+.ctl label b{color:var(--amber);font-weight:600;font-size:12px}
+input[type=range]{appearance:none;width:100%;height:26px;background:transparent;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:3px;background:var(--line);border-radius:2px}
+input[type=range]::-webkit-slider-thumb{appearance:none;width:15px;height:15px;border-radius:50%;background:var(--amber);border:2px solid var(--panel);margin-top:-6px;box-shadow:0 0 0 1px var(--amber)}
+input[type=range]:disabled{opacity:.4}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:3px;overflow:hidden;background:var(--screen);flex-wrap:wrap}
+.seg button{background:transparent;border:0;padding:7px 12px;font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.03em}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed=true]{background:var(--amber);color:#1a1108;font-weight:700}
+.switch{display:inline-flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.03em;cursor:pointer;user-select:none}
+.switch input{appearance:none;width:34px;height:18px;border-radius:9px;background:var(--line);position:relative;cursor:pointer;transition:background .18s}
+.switch input::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--muted);transition:transform .18s,background .18s}
+.switch input:checked{background:rgba(230,163,59,.35)}
+.switch input:checked::after{transform:translateX(16px);background:var(--amber)}
+.demo-out{min-height:60px}
+.hintline{font-family:var(--mono);font-size:10.5px;color:var(--faint);line-height:1.75;letter-spacing:.02em}
+.demo-foot{border-top:1px solid var(--line-soft);padding:11px 18px;font-family:var(--mono);font-size:10.5px;color:var(--faint);letter-spacing:.03em;line-height:1.8}
+.demo-foot b{color:var(--teal);font-weight:600}
+
+/* demo 1: clinic */
+.clinic-grid{display:grid;grid-template-columns:1fr 266px;gap:18px}
+.clinic{display:flex;flex-direction:column;gap:6px}
+.ch-row{display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:center;border:1px solid var(--line);background:var(--screen);border-radius:4px;padding:9px 12px;text-align:left;width:100%;transition:border-color .18s,background .18s}
+.ch-row:hover{border-color:var(--faint)}
+.ch-row[data-main=true]{border-color:rgba(230,163,59,.5);background:rgba(230,163,59,.05)}
+.ch-row[data-dead=true]{opacity:.55}
+.ch-row .nm{font-size:13px;font-weight:650;display:flex;align-items:center;gap:8px}
+.ch-row .nm .role{font-family:var(--mono);font-size:9px;letter-spacing:.06em;color:var(--amber);border:1px solid rgba(230,163,59,.4);padding:1px 5px;border-radius:2px;font-weight:500}
+.ch-row .md{grid-column:1/-1;font-family:var(--mono);font-size:10.5px;color:var(--faint);line-height:1.7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ch-row .caps{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
+.cap{font-family:var(--mono);font-size:9.5px;letter-spacing:.04em;padding:2px 6px;border-radius:2px;border:1px solid var(--line);color:var(--faint)}
+.cap.img{color:var(--amber);border-color:rgba(230,163,59,.4);background:var(--amber-soft)}
+.cap.vid{color:var(--teal);border-color:rgba(121,179,166,.4);background:var(--teal-soft)}
+.cap.vis{color:#a9c4a0;border-color:rgba(169,196,160,.35);background:rgba(169,196,160,.1)}
+.cap.txt{color:var(--muted)}
+.clinic-side{border-left:1px solid var(--line-soft);padding-left:16px}
+.clinic-side h5{margin:0 0 8px;font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--faint);font-weight:600}
+.kv{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px dashed var(--line-soft);font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+.kv b{color:var(--ink);font-weight:600}
+.evt{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+.evtrow{font-family:var(--mono);font-size:10.5px;line-height:1.65;padding:7px 10px;border-radius:3px;border:1px solid rgba(230,163,59,.22);background:rgba(230,163,59,.07);color:#e3c79a}
+.evtrow.bad{border-color:rgba(207,91,69,.26);background:rgba(207,91,69,.08);color:#e3b7ad}
+.evtrow.ok{border-color:rgba(121,179,166,.25);background:rgba(121,179,166,.08);color:#b7dcc7}
+.evtrow b{font-weight:650}
+
+/* demo 2: queue */
+.q-grid{display:grid;grid-template-columns:1fr 214px;gap:18px}
+.gantt{background:var(--screen);border:1px solid var(--line);border-radius:3px;padding:10px 10px 4px;position:relative}
+.qtrack{position:relative;height:13px;margin-bottom:3px;background:rgba(255,255,255,.02);border-radius:1px}
+.qbar{position:absolute;top:0;height:13px;border-radius:1px;background:linear-gradient(180deg,#4e7d73,#3a635c);opacity:.9;cursor:pointer}
+.qbar[data-state=immediate]{background:linear-gradient(180deg,#e6a33b,#b97f22)}
+.qbar[data-state=cancelled]{background:repeating-linear-gradient(135deg,#7a3527 0 4px,#5c2a20 4px 8px);opacity:.85}
+.qaxis{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;color:var(--faint);border-top:1px solid var(--line-soft);margin-top:6px;padding-top:4px}
+.q-side{font-family:var(--mono);font-size:10.5px;color:var(--muted);border-left:1px solid var(--line-soft);padding-left:15px}
+.q-side .row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px dashed var(--line-soft)}
+.q-side .row b{color:var(--ink);font-weight:600}
+.legend{display:flex;gap:11px;flex-wrap:wrap;margin-top:10px;color:var(--faint);font-family:var(--mono);font-size:9.5px}
+.legend i{display:inline-block;width:8px;height:8px;margin-right:4px;border-radius:1px;vertical-align:0}
+.big-num{display:flex;gap:26px;align-items:baseline;margin:2px 0 14px;flex-wrap:wrap}
+.big-num div{font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--faint)}
+.big-num div b{display:block;font-size:25px;color:var(--ink);letter-spacing:-.02em;line-height:1.3}
+.big-num div b em{color:var(--amber);font-style:normal}
+
+/* demo 3: ladder */
+.chain{display:flex;flex-direction:column;gap:0}
+.chip{display:grid;grid-template-columns:26px 1fr auto;gap:12px;align-items:start;border:1px solid var(--line);background:var(--screen);border-radius:4px;padding:11px 13px}
+.chip+.chip{margin-top:-1px}
+.chip .ix{font-family:var(--mono);font-size:11px;color:var(--faint);padding-top:2px}
+.chip .tt b{font-size:13.5px;display:block;line-height:1.55}
+.chip .tt small{font-family:var(--mono);font-size:10.5px;color:var(--faint);line-height:1.7;display:block;margin-top:2px}
+.chip .vd{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;padding:2px 7px;border-radius:2px;border:1px solid var(--line);color:var(--faint);white-space:nowrap}
+.chip[data-v=run]{border-color:rgba(230,163,59,.4);background:rgba(230,163,59,.05)}
+.chip[data-v=run] .vd{color:var(--amber);border-color:rgba(230,163,59,.45)}
+.chip[data-v=pass]{border-color:rgba(121,179,166,.3);background:rgba(121,179,166,.05)}
+.chip[data-v=pass] .vd{color:var(--teal);border-color:rgba(121,179,166,.4)}
+.chip[data-v=stop]{border-color:rgba(207,91,69,.35);background:rgba(207,91,69,.06)}
+.chip[data-v=stop] .vd{color:#e88b7b;border-color:rgba(207,91,69,.4)}
+.chip[data-v=skip]{opacity:.5}
+.verdict-box{margin-top:14px;border:1px solid var(--line);border-radius:4px;background:var(--panel-2);padding:13px 15px;font-size:13.5px;line-height:1.8}
+.verdict-box b{color:var(--amber)}
+.verdict-box .code-line{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:6px;letter-spacing:.02em}
+
+/* demo 4: ledger */
+.ledger-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:stretch}
+.ledger-in{background:var(--screen);border:1px solid var(--line);border-radius:4px;padding:13px 14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.ledger-in label{font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--faint);display:block;margin-bottom:2px}
+.mono-block{font-family:var(--mono);font-size:10.5px;line-height:1.75;color:#b9c7bf;background:#070605;border:1px solid var(--line-soft);border-radius:3px;padding:9px 10px;white-space:pre-wrap;word-break:break-word;max-height:132px;overflow:auto}
+.ledger-in .mono-block{flex:1;max-height:none;min-height:120px}
+.ledger-out{border:1px solid var(--line);border-radius:4px;background:var(--screen);padding:13px 14px;min-width:0}
+.ledger-out .lh{display:flex;justify-content:space-between;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;letter-spacing:.07em;color:var(--faint);margin-bottom:9px}
+.ledger-row{display:grid;grid-template-columns:78px 1fr;gap:8px;padding:5px 0;border-bottom:1px dashed var(--line-soft);font-size:12.5px;line-height:1.7;word-break:break-word}
+.ledger-row:last-child{border-bottom:0}
+.ledger-row span{font-family:var(--mono);font-size:10px;color:var(--faint);letter-spacing:.03em;padding-top:3px}
+.ledger-row b{font-weight:500;color:var(--ink-soft);font-family:var(--mono);font-size:11.5px}
+.ledger-row b.hot{color:var(--amber)}
+.notice{font-family:var(--mono);font-size:10.5px;line-height:1.7;color:#e3c79a;background:rgba(230,163,59,.07);border:1px solid rgba(230,163,59,.2);border-radius:3px;padding:8px 10px;margin-top:8px}
+
+/* epilogue / closing */
+.epilogue{max-width:768px;margin:0 auto;padding-block:40px 20px}
+.epilogue h2{font-size:clamp(27px,3vw,37px);margin-bottom:18px}
+.rules{display:grid;gap:12px;margin:26px 0 30px}
+.rule{border:1px solid var(--line);border-left:3px solid var(--teal);background:var(--panel);padding:15px 18px;border-radius:0 4px 4px 0}
+.rule b{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;color:var(--teal);margin-bottom:5px}
+.rule p{margin:0;font-size:14.5px;color:var(--ink-soft);line-height:1.85}
+.limits{border-top:1px solid var(--line);padding-top:20px;font-size:13.5px;color:var(--muted)}
+.limits b{color:var(--ink-soft)}
+.links{display:flex;flex-wrap:wrap;gap:10px;margin:26px 0 10px}
+.links a{font-family:var(--mono);font-size:11px;letter-spacing:.04em;border:1px solid var(--line);padding:8px 13px;border-radius:3px;text-decoration:none;color:var(--teal);background:var(--panel)}
+.links a:hover{border-color:var(--amber);color:var(--amber)}
+
+/* footer */
+.site-foot{border-top:1px solid var(--line);margin-top:56px;padding-block:26px 40px;display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;color:var(--faint)}
+.site-foot a{color:var(--muted)}
+.foot-note{font-size:10.5px;color:#5f584e;line-height:1.8;max-width:580px}
+
+/* responsive */
+@media (max-width:980px){
+  .hero{grid-template-columns:1fr;gap:34px;padding-block:44px 34px}
+  .hero h1{font-size:clamp(38px,7.6vw,56px)}
+  .stats-inner{grid-template-columns:repeat(2,1fr)}
+  .ch-head{grid-template-columns:64px 1fr;gap:16px}
+  .ch-num b{font-size:26px}
+  .clinic-grid,.q-grid,.ledger-grid{grid-template-columns:1fr}
+  .clinic-side,.q-side{border-left:0;border-top:1px solid var(--line-soft);padding-left:0;padding-top:12px}
+  .toc{grid-template-columns:1fr}
+  .controls.stacked{grid-template-columns:1fr}
+}
+@media (max-width:620px){
+  .wrap{padding-inline:18px}
+  .masthead{font-size:10px;letter-spacing:.06em}
+  .edition .rec{display:none}
+  .hero h1{font-size:37px}
+  .lead{font-size:17.5px}
+  .ch-head{grid-template-columns:1fr;gap:8px}
+  .ch-num{border-top:0;padding-top:0;display:flex;align-items:baseline;gap:10px}
+  .ch-num b{font-size:22px}
+  .ch-title h2{font-size:27px}
+  .ch-body h3{font-size:19px}
+  .pull{font-size:16.5px}
+  .demo-body{padding:14px}
+  .demo-title .hint{display:none}
+  .code pre{font-size:11.5px}
+  .fig{width:calc(100vw - 32px)}
+  .big-num{gap:16px}
+  .big-num div b{font-size:21px}
+  .q-side{font-size:10px}
+  .chip{grid-template-columns:20px 1fr}
+  .chip .vd{grid-column:2;justify-self:start}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+}
+@media print{
+  body{background:#fff;color:#111}
+  .progress,.demo,.art,.links,.toc,.site-foot{display:none}
+  .chapter{border-color:#ccc}
+}
+
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+<header class="wrap masthead">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="2" stroke="#e6a33b" stroke-width="1.3"/><circle cx="12" cy="9.5" r="2.4" stroke="#79b3a6" stroke-width="1.2"/><path d="M6 15.5h12M6 17.8h7" stroke="#e6a33b" stroke-width="1" opacity=".7"/><path d="M12 4v2.2" stroke="#e6a33b" stroke-width="1"/></svg></span>
+    <span>造物手记 <small>VOL.06</small></span>
+  </div>
+  <div class="edition">
+    <span class="rec"><i class="rec-dot" aria-hidden="true"></i>SAFELIGHT ON / 暗房作业中</span>
+    <span>VOL.06 · 2026.10</span>
+  </div>
+</header>
+
+<section class="wrap hero">
+  <div>
+    <p class="eyebrow"><span>FIELD NOTES</span>一个 AI 生图工作台的解剖报告</p>
+    <h1>等一张图<br/><em>显影</em><span class="sub">从渠道体检到队列预算——一条不许跳步的流水线</span></h1>
+    <div class="dek-wrap">
+      <p class="dek-tag">本篇提要</p>
+      <p class="dek">生图工具都在比谁的模型多。可真用起来，先坏掉的往往不是模型：是那条把「一次点按」翻译成「一次排队、一次降级、一次落盘、一次记账」的流水线。这篇拆一个自己写的生图工作台：它怎么查渠道、怎么排队、怎么在失败时换一条路，以及它凭什么说某句话是作者写的、某句话是它猜的。</p>
+    </div>
+    <div class="hero-meta">
+      <span class="pill"><b>48</b> 条已配渠道</span>
+      <span class="pill"><b>30</b> 个 API 路由</span>
+      <span class="pill"><b>56</b> 个测试用例</span>
+      <span class="pill"><b>4</b> 档降级</span>
+    </div>
+  </div>
+  <figure class="art">
+    <div class="sheet">
+      <div class="sheet-img">
+        <img src="assets/art/hero.webp" alt="暗房里的木桌：一盏琥珀色安全灯，一台老式胶片放大机把光柱投在显影盘上方，桌上散落着几张刚显影完成的黑白照片，背景里一台屏幕显示着四格图片网格" width="1536" height="1024"/>
+        <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+      </div>
+      <div class="exif-bar"><span>SAFELIGHT / 12&nbsp;ft-candle</span><span class="hot">F8 · 1/125 · ISO 400</span></div>
+    </div>
+    <figcaption><span><b>FIG. 00</b> 显影不是一瞬间，是一段可以被掐断的过程</span><span>OIL / DIGITAL / 2026</span></figcaption>
+  </figure>
+</section>
+
+<section class="stats" aria-label="关键数字">
+  <div class="wrap stats-inner">
+    <div class="stat"><b>48<span>条</span></b><small>本机配置的模型渠道</small></div>
+    <div class="stat"><b>4<span>张</span></b><small>本机真正生成的作品</small></div>
+    <div class="stat"><b>30<span>个</span></b><small>API 路由（不含静态页）</small></div>
+    <div class="stat"><b>55<span>/56</span></b><small>测试通过（1 条挂着）</small></div>
+  </div>
+</section>
+
+<div class="wrap opening">
+  <div class="prose">
+    <p class="lead">2026 年 10 月，我为了给这篇文章配五张插图，同时把三个生成请求发给了一个聚合渠道。两个当场被退回：<code>429 · User concurrency limit reached</code>。四个小时以后，改成一条一条地发，五张图全部出完，单张 75 到 306 秒不等。这条经验听起来像废话，但它正是这个工作台第一版就要解决的问题——<strong>生图不是一次请求，是一条会堵、会断、会被人半路掐掉的流水线。</strong></p>
+    <p>这篇文章解剖的是「画境」，一个自己写的生图工作台。它把渠道管理、提示词润色、参考图与局部重绘、批量矩阵、图库、视频工坊放在同一间屋子里。源码里最长的两个文件是 1,868 行的服务端和 1,128 行的设置页——不优雅，但每一行都对应一次真实的失败。</p>
+    <p>我刻意保留了它的狼狈：本机配了 <strong>48 条渠道</strong>，真正生成过的作品只有 <strong>4 张</strong>；渠道列表长到必须折叠成一行；能力识别靠模型名里的关键词猜；元数据读取要区分「作者写的」和「AI 猜的」。这些不是缺陷清单，这是一个私人工具在真实网络里活下来的形状。</p>
+    <p class="scope">阅读说明：全文约一万二千字，七章。<b>第 1 章</b>给整条流水线的全貌；<b>第 2、3 章</b>是最脏的两块——渠道体检和队列预算；<b>第 4、5 章</b>讲一次生成怎么落盘、失败怎么换路；<b>第 6 章</b>是元数据账本，关于「谁写了这句话」；<b>第 7 章</b>讲怎么证明它没偷偷撒谎。四枚小样全部是确定性模型，参数与判定规则写在正文里，可以自己拖。</p>
+  </div>
+
+  <p class="toc-head"><span>PLATE LIST / 工序表</span><span>07 CHAPTERS · 04 DEMOS</span></p>
+  <nav class="toc" aria-label="目录">
+    <a href="#ch1"><i>01 / PREP</i><span>一行提示词背后<small>一次点按在服务端展开成十六个动作</small></span></a>
+    <a href="#ch2"><i>02 / SOURCE</i><span>渠道是会撒谎的接口<small>76 行列表、按名字猜能力、与一次体检</small></span></a>
+    <a href="#ch3"><i>03 / QUEUE</i><span>并发是一笔预算<small>队列、取消的三种时态、与那句 429</small></span></a>
+    <a href="#ch4"><i>04 / DEVELOP</i><span>一张图的完整旅程<small>base64、URL、mime 白名单与原子写</small></span></a>
+    <a href="#ch5"><i>05 / FALLBACK</i><span>打不过就换一条路<small>四档降级、错误码白名单、十分钟巡检</small></span></a>
+    <a href="#ch6"><i>06 / LEDGER</i><span>谁写了这句话<small>A1111 / ComfyUI / InvokeAI 与「AI 推测」标签</small></span></a>
+    <a href="#ch7"><i>07 / PROOF</i><span>怎么证明它没撒谎<small>56 个测试、错误码分类、以及它管不了的事</small></span></a>
+    <a href="#closing"><i>END / FIX</i><span>结语：把剪刀停在半空<small>三条可以搬走的做法，与四个没解决的死角</small></span></a>
+  </nav>
+</div>
+
+<main>
+<section class="chapter" id="ch1">
+  <div class="ch-head">
+    <div class="ch-num">SCENE<b>01</b></div>
+    <div class="ch-title">
+      <h2>一行提示词背后</h2>
+      <p>用户在创作页按下「生成」，到图库里出现一张能翻页的缩略图，中间隔着十六个动作。模型只负责其中一个。</p>
+    </div>
+  </div>
+  <div class="ch-body">
+    <p class="lede">所有生图产品的演示都长一个样：输入一句话，等一下，一张图从模糊变清晰。这个等的过程被打包成一个进度条，于是没人知道里面发生了什么。可一旦你自己维护这套东西，进度条就会开始骗人——它涨到 90% 停了三十秒，你不知道是在排队、在等上游、在下载，还是上游其实早就返回了、只是你的磁盘写不动。</p>
+    <p>「画境」的第一版只有一条通路：前端把提示词和一个渠道 ID 发到 <code>POST /api/generations</code>，服务端调一次 <code>/v1/images/generations</code>，把 base64 解出来存成文件，返回。不到两百行。它能用，但只在你恰好有一个健康渠道、一次只点一张、网络不抖的时候能用。</p>
+    <p>今天这个版本有 30 条 API 路由、11,329 行前后端 JS。多出来的部分几乎全是「不顺利的时候怎么办」。把一次点按摊开，是这样十六个动作：</p>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>阶段</th><th>动作</th><th>落在哪</th></tr></thead>
+        <tbody>
+          <tr><td class="num">入参</td><td>校验提示词非空；解析这次用哪个渠道、哪个模型、什么尺寸</td><td><code>server.js</code></td></tr>
+          <tr><td class="num">入参</td><td>参考图已先一步落盘到 <code>data/references/</code>，这里只取文件名</td><td><code>store</code></td></tr>
+          <tr><td class="num">记账</td><td>按 <code>n</code> 拆成 N 条记录，逐条 <code>status:'queued'</code>，写 <code>queuedAt</code></td><td><code>store</code></td></tr>
+          <tr><td class="num">排队</td><td>入队，用 <code>queuedGenerationIds</code> 去重，<code>setImmediate</code> 触发下一次排空</td><td><code>drainGenerationQueue</code></td></tr>
+          <tr><td class="num">排队</td><td>检查并发槽：<code>runningGenerations &lt; generationConcurrency</code> 才放行</td><td><code>server.js</code></td></tr>
+          <tr><td class="num">排队</td><td>改 <code>running</code>，写 <code>startedAt</code> 与 <code>queueDurationMs</code></td><td><code>store</code></td></tr>
+          <tr><td class="num">调用</td><td>取渠道、取模型、把负面提示词拼进正文</td><td><code>provider-service</code></td></tr>
+          <tr><td class="num">调用</td><td>有参考图走 <code>/images/edits</code>（multipart），没有走 <code>/images/generations</code></td><td><code>fetchWithTimeout</code></td></tr>
+          <tr><td class="num">调用</td><td>超时、代理、认证头，全部由渠道级配置决定</td><td><code>http-transport</code></td></tr>
+          <tr><td class="num">解码</td><td><code>b64_json</code> 直接解码；<code>url</code> 则二次下载并验 mime</td><td><code>provider-service</code></td></tr>
+          <tr><td class="num">降级</td><td>无图字段 → 尝试 chat 型生图；上游挂了 → 换一个渠道再试一次</td><td><code>generateImage</code></td></tr>
+          <tr><td class="num">落盘</td><td>文件名用 <code>crypto.randomUUID()</code>，先写临时文件再 <code>rename</code></td><td><code>atomicWrite</code></td></tr>
+          <tr><td class="num">落盘</td><td>记录改 <code>completed</code>，写入 <code>media[]</code>、耗时、来源渠道</td><td><code>store</code></td></tr>
+          <tr><td class="num">收尾</td><td>预热 640px WebP 缩略图；sharp 不可用就静默降级</td><td><code>thumbnail-service</code></td></tr>
+          <tr><td class="num">读取</td><td>前端轮询列表，默认只拿缩略图，点开才取原图</td><td><code>gallery</code></td></tr>
+          <tr><td class="num">读取</td><td>搜索、收藏、复制提示词、同款生成、打包下载</td><td><code>zip-service</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="fig">
+      <div class="frame">
+        <svg viewBox="0 0 960 300" role="img" aria-label="生图流水线：客户端、接口、队列、渠道、磁盘与图库五段，模型只是其中一段">
+          <rect width="960" height="300" fill="#080706"/>
+          <defs>
+            <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M0 0 L10 5 L0 10 z" fill="#6e6659"/>
+            </marker>
+          </defs>
+          <g font-family="ui-monospace,Consolas,monospace" font-size="10.5" fill="#948b7e">
+            <text x="24" y="28">点击</text>
+            <text x="168" y="28">HTTP</text>
+            <text x="352" y="28">状态机</text>
+            <text x="540" y="28">网络</text>
+            <text x="712" y="28">磁盘</text>
+            <text x="850" y="28">读取</text>
+          </g>
+          <g>
+            <rect x="18" y="44" width="108" height="58" rx="4" fill="#151210" stroke="#2a231a"/>
+            <text x="34" y="68" fill="#f0e8da" font-family="ui-monospace,monospace" font-size="12">创作页</text>
+            <text x="34" y="86" fill="#6e6659" font-family="ui-monospace,monospace" font-size="9.5">prompt / size / n</text>
+
+            <rect x="150" y="44" width="150" height="58" rx="4" fill="#151210" stroke="#2a231a"/>
+            <text x="166" y="68" fill="#f0e8da" font-family="ui-monospace,monospace" font-size="12">POST /generations</text>
+            <text x="166" y="86" fill="#e6a33b" font-family="ui-monospace,monospace" font-size="9.5">一条记录 = 一个任务</text>
+
+            <rect x="324" y="38" width="164" height="70" rx="4" fill="#151210" stroke="#e6a33b" stroke-opacity=".45"/>
+            <text x="340" y="60" fill="#f0e8da" font-family="ui-monospace,monospace" font-size="12">队列 · 并发槽</text>
+            <text x="340" y="78" fill="#e6a33b" font-family="ui-monospace,monospace" font-size="9.5">queued → running</text>
+            <text x="340" y="94" fill="#6e6659" font-family="ui-monospace,monospace" font-size="9.5">默认 2，上限 8</text>
+
+            <rect x="512" y="38" width="164" height="70" rx="4" fill="#151210" stroke="#79b3a6" stroke-opacity=".5"/>
+            <text x="528" y="60" fill="#f0e8da" font-family="ui-monospace,monospace" font-size="12">渠道 /v1/images</text>
+            <text x="528" y="78" fill="#79b3a6" font-family="ui-monospace,monospace" font-size="9.5">b64 或 url</text>
+            <text x="528" y="94" fill="#6e6659" font-family="ui-monospace,monospace" font-size="9.5">超时 180s · 代理可选</text>
+
+            <rect x="700" y="38" width="140" height="70" rx="4" fill="#151210" stroke="#2a231a"/>
+            <text x="716" y="60" fill="#f0e8da" font-family="ui-monospace,monospace" font-size="12">atomicWrite</text>
+            <text x="716" y="78" fill="#6e6659" font-family="ui-monospace,monospace" font-size="9.5">tmp → rename</text>
+            <text x="716" y="94" fill="#6e6659" font-family="ui-monospace,monospace" font-size="9.5">db.json 原子快照</text>
+
+            <rect x="864" y="44" width="78" height="58" rx="4" fill="#151210" stroke="#2a231a"/>
+            <text x="876" y="68" fill="#f0e8da" font-family="ui-monospace,monospace" font-size="12">图库</text>
+            <text x="876" y="86" fill="#6e6659" font-family="ui-monospace,monospace" font-size="9.5">640px 缩略</text>
+
+            <path d="M126 73 H146" stroke="#6e6659" marker-end="url(#ar)"/>
+            <path d="M300 73 H320" stroke="#6e6659" marker-end="url(#ar)"/>
+            <path d="M488 73 H508" stroke="#6e6659" marker-end="url(#ar)"/>
+            <path d="M676 73 H696" stroke="#6e6659" marker-end="url(#ar)"/>
+            <path d="M840 73 H860" stroke="#6e6659" marker-end="url(#ar)"/>
+          </g>
+          <g font-family="ui-monospace,Consolas,monospace" font-size="9.5" fill="#6e6659">
+            <text x="18" y="140">失败发生在任意一段，都会往回走一层：</text>
+            <text x="18" y="160" fill="#cf5b45">渠道 500 → 换一条渠道</text>
+            <text x="212" y="160" fill="#cf5b45">渠道 404 / 空 data → 换 chat 型接口</text>
+            <text x="500" y="160" fill="#cf5b45">写盘失败 → 任务标 failed，不落半张图</text>
+            <text x="18" y="182" fill="#79b3a6">而模型自己，只占「渠道」这一格。</text>
+          </g>
+          <g>
+            <rect x="18" y="204" width="924" height="1" fill="#2a231a"/>
+            <text x="18" y="228" fill="#948b7e" font-family="ui-monospace,monospace" font-size="9.5">同一套骨架被复用到四处：</text>
+            <text x="18" y="248" fill="#cfc4b2" font-family="ui-monospace,monospace" font-size="10">文生图 / 参考图编辑（/images/edits） / 局部重绘（带蒙版） / 批量矩阵（N 条记录 × 各自排队）</text>
+            <text x="18" y="270" fill="#6e6659" font-family="ui-monospace,monospace" font-size="9.5">视频工坊是另一条异步链：提交拿 remoteTaskId → 轮询 → 下载成片，最长等 15 分钟。</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption><b>FIG. 01</b>一次生成的五段式骨架。模型在第三段；剩下的四段，才是这个项目一万多行代码的去处。</figcaption>
+    </div>
+
+    <h3>为什么不是一个接口搞定</h3>
+    <p>因为每一段都会独立失败，而失败需要不同的反应。把它们塞进一个函数，你就只能统一抛一个「生成失败」，然后永远不知道是谁的错：是渠道挂了、是 key 过期、是模型名拼错、是上游返回了 SVG、还是磁盘满了。</p>
+    <p>拆开之后，错误就有了名字。这个项目里定义了几十个错误码，全部带 HTTP 状态：<code>PROVIDER_NOT_FOUND</code> 是 404、<code>API_KEY_REQUIRED</code> 是 400、<code>PROVIDER_AUTH_FAILED</code> 是 401、<code>IMAGE_MIME_INVALID</code> 是 502、<code>TASK_NOT_CANCELLABLE</code> 是 409。前端不需要理解上游的方言，只看这几个码就能给出人话提示。</p>
+    <div class="note"><b>一个副作用：</b>错误码变成了降级逻辑的开关。第 5 章会讲，哪些码值得换渠道重试、哪些必须立刻停手，全靠这张码表决定。先有名字，才谈得上选择。</div>
+
+    <h3>状态的三种时态</h3>
+    <p>一条生成记录只有四个状态：<code>queued</code>、<code>running</code>、<code>completed</code>、<code>failed</code>；加上用户的意志，多一个 <code>cancelled</code>。看起来简单，但「取消」在这套流水线里不是一个布尔量，而是三个不同时刻的三件不同的事：</p>
+    <ul>
+      <li><strong>排队时取消</strong>：直接出队，任务从未花过上游一分钱。</li>
+      <li><strong>运行中取消</strong>：落 <code>cancelled</code>，但 HTTP 请求不会中断——它继续跑完，回来后结果被丢弃，不入库。上游的钱已经花了。</li>
+      <li><strong>结果已回但未落盘时取消</strong>：同样丢弃，因为检查发生在写盘之前。</li>
+    </ul>
+    <p>三种时态的差别，用户看不到。他们看到的只是「点了取消，图没了」。但账本上必须留下差别，因为第一种是零成本，后两种是已付费。这套系统的所有诚实，都建立在这种「用户看不见、但账上记着」的区分上。</p>
+    <div class="pull">生图工具最容易骗人的地方，是它把「排队」「等待」「失败重试」全画成同一个转圈。<b>而工程的起点，是让这圈转得有名有姓。</b></div>
+  </div>
+</section>
+
+<section class="chapter" id="ch2">
+  <div class="ch-head">
+    <div class="ch-num">SCENE<b>02</b></div>
+    <div class="ch-title">
+      <h2>渠道是会撒谎的接口</h2>
+      <p>48 条渠道，没有一条是我在这个工作台里手工敲进去的。而它们对自己能干什么的描述，全都靠一个字符串在猜。</p>
+    </div>
+  </div>
+  <div class="ch-body">
+    <p class="lede">先看一个数字：这台机器上的 <code>db.json</code> 里有 <strong>48 个渠道</strong>，而真正生成过的作品只有 4 张。比例荒唐得像个笑话，但它精确地描述了一个私人工具的真实处境——渠道是收集来的，作品是稀缺的。</p>
+    <p>这些渠道来自一次扫描。功能叫「站点接入」，实现是三个只读探针：CC Switch 的 SQLite 库、<code>~/.claude/settings.json</code>、<code>~/.codex/config.toml</code> + <code>auth.json</code>。它们把我在别的 agent 工具里配过的 base URL、key 和模型线索全捞出来，去重、脱敏、列成一个可勾选的清单。</p>
+
+    <h3>读别人的库，先学会不弄坏它</h3>
+    <p>CC Switch 在运行时会不停地写那个库。直接开它，轻则读到半份数据，重则和它抢锁。所以扫描器的第一步是把 <code>.db</code>、<code>-wal</code>、<code>-shm</code> 三个文件一起复制到临时目录，再打开副本——WAL 不能少，少了就是一份少了最近提交的快照。</p>
+    <p>然后是重试。复制出来的快照偶尔仍然不一致，代码用三次尝试、400ms 和 800ms 的同步等待兜底。同步等待在这里是可耻但正确的：它跑在一个显式的、用户点了按钮才触发的动作里，阻塞两秒比返回一个残缺的渠道列表要好。</p>
+    <div class="code">
+      <div class="code-bar"><b>src/import-scan.js</b><span>readCcSwitchProviders</span></div>
+<pre><span class="c">// CC Switch 运行中会频繁写库,复制出的快照偶发不一致:重试几次通常可恢复</span>
+<span class="k">for</span> (<span class="k">let</span> attempt = <span class="n">0</span>; attempt &lt; <span class="n">3</span>; attempt += <span class="n">1</span>) {
+  <span class="k">try</span> {
+    readCcSwitchProvidersOnce(dbPath, list, seen);
+    <span class="k">return</span>;
+  } <span class="k">catch</span> {
+    <span class="k">if</span> (attempt === <span class="n">2</span>) <span class="k">return</span>;
+    <span class="k">const</span> wait = <span class="n">400</span> * (attempt + <span class="n">1</span>);
+    <span class="k">const</span> until = Date.now() + wait;
+    <span class="k">while</span> (Date.now() &lt; until) { <span class="c">/* 同步等待 */</span> }
+  }
+}</pre>
+    </div>
+    <p>去重用的不是渠道名，是 <code>sha1(小写 baseUrl + '|' + apiKey)</code> 的前 16 位。同名不同 key 是两条渠道，同 key 不同名是一条——因为名字是人起的，而「同一个地址配同一把钥匙」才是物理意义上的同一个入口。</p>
+    <p>但 key 不进前端。接口返回前会被 <code>publicProvider()</code> 剥掉 <code>apiKey</code>、<code>proxyUrl</code>、<code>cookie</code> 三个字段，换成三个布尔量和一个掩码：前 3 位 + 四个圆点 + 后 4 位，短于 8 位直接全遮。这条规则的动机很朴素——列表会被截图，会出现在录屏里，会被人发到群里问「这个站有人用过吗」。</p>
+
+    <h3>体检：一次 15 秒的拷问</h3>
+    <p>渠道配好之后，第一件要做的事是问它「你到底有哪些模型」。这动作叫体检，接口是 <code>POST /api/providers/discover-all</code>。它把所有启用的渠道塞进一个队列，四个 worker 并发处理，每个渠道发一次 <code>GET {base}/models</code>，15 秒超时。</p>
+    <p>难点在于地址。有的站是 <code>https://x.com</code>，模型在 <code>/v1/models</code>；有的直接给你 <code>https://x.com/v1</code>；有的把生图和对话拆成两条完全不同的路径；还有一些中转站，模型列表挂在 <code>/api/claudecode</code>、<code>/api/anthropic</code>、<code>/coding</code> 这类非标准前缀下。代码里为此维护了一张候选表：先按 URL 的形态推出 <code>/v1/models</code>，再加上兼容后缀反推根路径，逐个试。</p>
+    <div class="code">
+      <div class="code-bar"><b>src/provider-service.js</b><span>COMPAT_SUFFIXES 与失败策略</span></div>
+<pre><span class="k">const</span> COMPAT_SUFFIXES = [
+  <span class="s">'/api/claudecode'</span>, <span class="s">'/api/anthropic'</span>, <span class="s">'/apps/anthropic'</span>, <span class="s">'/api/coding'</span>,
+  <span class="s">'/claudecode'</span>, <span class="s">'/anthropic'</span>, <span class="s">'/step_plan'</span>, <span class="s">'/coding'</span>, <span class="s">'/claude'</span>
+];
+
+<span class="c">// 404 / 405 说明这条路没有路由，换下一条；401 / 403 说明钥匙不对，换端点也没用</span>
+<span class="k">if</span> ([<span class="n">404</span>, <span class="n">405</span>].includes(response.status)) {
+  lastError = error;
+  <span class="k">continue</span>;
+}
+<span class="k">throw</span> error;</pre>
+    </div>
+    <p>这个区分是整个项目里我最满意的一处小设计：<strong>把「找不到路」和「进不去门」当成两件不同的事。</strong>找不到路就继续试，进不去门就立刻停。很多自动探测写得又慢又吵，就是因为把两者混为一谈，拿着过期的 key 把八个候选端点挨个撞一遍。</p>
+    <p>体检的产物是一个 <code>discovery</code> 对象：体检时间、模型总数、生图模型列表（最多留 40 个）、视频模型列表（20 个）、全部模型 ID（120 个）、错误信息、以及一个可选的余额数字。余额靠两次额外请求：<code>/dashboard/billing/subscription</code> 拿硬额度，<code>/dashboard/billing/usage</code> 拿已用，两个 8 秒超时，任一失败就默默不显示。不是所有站都有这两个接口，绝大多数没有。</p>
+
+    <h3>能力是猜的，而且猜得很粗</h3>
+    <p>这是这一章必须说清楚的地方。模型能不能生图，系统并不知道。它只知道模型名里有没有这些词：</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>能力</th><th>命中的关键词（节选）</th></tr></thead>
+        <tbody>
+          <tr><td><span class="tag warn">生图</span></td><td><code>image</code> <code>dall</code> <code>flux</code> <code>stable-diffusion</code> <code>sdxl</code> <code>imagen</code> <code>ideogram</code> <code>kolors</code> <code>qwen-image</code> <code>seedream</code></td></tr>
+          <tr><td><span class="tag">视频</span></td><td><code>sora</code> <code>video</code> <code>kling</code> <code>seedance</code> <code>hailuo</code> <code>veo</code> <code>wanx</code> <code>pika</code> <code>runway</code> <code>ltx</code> <code>mochi</code></td></tr>
+          <tr><td><span class="tag ok">视觉</span></td><td><code>vision</code> <code>vl</code> <code>gpt-4o</code> <code>gemini</code> <code>qwen-vl</code> <code>llava</code></td></tr>
+          <tr><td><span class="tag">文本</span></td><td><code>gpt</code> <code>claude</code> <code>deepseek</code> <code>llama</code> <code>chat</code>……以及<strong>所有什么都没命中的模型</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>这四条规则有两个必然的误判，而且在这个项目的日常里都以真实案例出现过：</p>
+    <ul>
+      <li><strong>真的能生图、但名字不含关键词的模型会被判成文本。</strong>最典型的就是那些把路由交给上游的站，模型名直接叫 <code>auto</code>。按规则它一条都不命中，于是被归进「文本」——它明明是最强的那条生图入口，却永远进不了自动降级的候选池。</li>
+      <li><strong>名字含关键词、但其实只做对话的模型会被判成生图。</strong>反过来同样成立：有人在对话模型名里塞了 <code>image</code> 做营销，体检就会把它列进生图列表，直到第一次真调用才露馅。</li>
+    </ul>
+    <div class="note"><b>所以列表必须可折叠。</b>真实使用里，48 条渠道意味着 76 行、每行带一串模型标签。这个页面最初是整段平铺的，翻三屏都翻不到底；后来改成整段可折叠，只剩一行头，开合状态记在本地。这不是审美问题，是「你会不会真的去用它」的问题。</div>
+
+    <figure class="fig">
+      <div class="frame"><img src="assets/art/probe.webp" alt="黑暗空间里悬着几十只发光灯泡，由细线连成网络；多数亮着暖光，少数灰暗熄灭，一颗青绿色光点正沿线路移动" width="1024" height="1024"/></div>
+      <figcaption><b>FIG. 02</b>渠道体检的实质：挨个敲门，记下哪些灯亮着。亮着的未必能生图，灭着的也未必真死——只是这十五秒里没应答。</figcaption>
+    </figure>
+
+    <h3>把这件事摊开</h3>
+    <p>下面这枚小样用源码里那四张关键词表做判定，你可以让主力渠道「挂掉」，看巡检会挑谁接班；也可以把某个渠道标成「已锁定」，看它在失败面前只能干等。特别注意那个叫 <code>auto</code> 的渠道——它有生图能力，但一条关键词都不命中。</p>
+  </div>
+
+  <div class="demo" id="demo-clinic">
+    <div class="demo-head">
+      <span class="demo-tag">DEMO 01</span>
+      <span class="demo-title">渠道体检台 <span class="hint">点一行设为主力，再让它挂掉</span></span>
+    </div>
+    <div class="demo-body">
+      <div class="controls">
+        <label class="switch"><input id="cl-paid" type="checkbox"/>把「auto」那条的模型手动标成生图</label>
+        <label class="switch"><input id="cl-lock" type="checkbox"/>锁定主力，不自动切换</label>
+        <button type="button" class="seg" id="cl-kill" style="border:1px solid var(--line);background:var(--screen);padding:7px 12px;font-family:var(--mono);font-size:11px;color:var(--amber);letter-spacing:.03em;border-radius:3px">模拟主力挂掉</button>
+      </div>
+      <div class="clinic-grid">
+        <div>
+          <div class="clinic" id="cl-list"></div>
+          <p class="hintline" style="margin-top:10px">能力标签由模型名关键词推断：<b style="color:var(--amber)">生图</b> / <b style="color:var(--teal)">视频</b> / <b style="color:#a9c4a0">视觉</b> / 文本（兜底）。真实系统还会用一次 <code>/models</code> 探活确认，但确认不了能力。</p>
+        </div>
+        <div class="clinic-side">
+          <h5>巡检判定</h5>
+          <div class="kv"><span>主力</span><b id="cl-main">—</b></div>
+          <div class="kv"><span>主力生图模型</span><b id="cl-main-models">0</b></div>
+          <div class="kv"><span>可接班渠道</span><b id="cl-cand">0</b></div>
+          <div class="kv"><span>巡检间隔</span><b>10 min</b></div>
+          <div class="evt" id="cl-events"></div>
+        </div>
+      </div>
+    </div>
+    <div class="demo-foot"><b>判定依据</b>：候选 = 除主力外、启用中、有 baseUrl、<code>discovery.imageModels.length &gt; 0</code> 的渠道，按生图模型数量降序取第一个；若 <code>roles.image.locked</code> 为真则只记一条事件，不切。</div>
+  </div>
+</section>
+
+<section class="chapter" id="ch3">
+  <div class="ch-head">
+    <div class="ch-num">SCENE<b>03</b></div>
+    <div class="ch-title">
+      <h2>并发是一笔预算</h2>
+      <p>对一个按「每用户并发」限流的渠道，客户端并发不是提速，是自伤。这句话我用一个下午验证了两遍。</p>
+    </div>
+  </div>
+  <div class="ch-body">
+    <p class="lede">第一节里那个 <code>429 · User concurrency limit reached</code>，值得单独讲一段。我当时要五张插图，很自然地并行发了三个——毕竟在自己的机器上，并发是免费的。结果是两个立刻被拒，一个跑了 306 秒才回来。把剩下两张改成一条一条发，全部成功，单张 75 到 83 秒。</p>
+    <p>这不是巧合。很多聚合渠道按「同一账户同时在途的请求数」限流，常见上限就是 1 到 2。你的并发一旦越过它，多出来的请求不是排队，是直接被拒。于是「并发提速」变成了「并发把成功率打到三分之一，再靠重试把时间补回来」。</p>
+    <div class="pull">排队不是慢。排队是把「一定会被拒的并发」换成「一定会被服务的顺序」。<b>在限流的世界里，唯一的加速是少发请求。</b></div>
+
+    <h3>三层闸门</h3>
+    <p>服务端里有三个独立的并发参数，各自服务于不同规模的意图：</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>闸门</th><th>默认</th><th>范围</th><th>它想保护谁</th></tr></thead>
+        <tbody>
+          <tr><td class="num">全局生图</td><td><code>2</code></td><td>1 – 8</td><td>整机同时打给上游的请求总数</td></tr>
+          <tr><td class="num">单批批量</td><td><code>2</code></td><td>2 – 6</td><td>一次批量矩阵内部的同时在途数</td></tr>
+          <tr><td class="num">视频</td><td><code>1</code></td><td>1 – 4</td><td>最贵的那条链：最长等 15 分钟</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>生图默认 2，不是拍脑袋。一方面，2 正好能吃掉「一次生成 4 张、后台慢慢出」的常见节奏；另一方面，2 是小渠道常见限流阈值附近最保守又不至于完全串行的值。视频默认 1，因为一条视频任务可能占着上游十几分钟，并发两条只会让两条都变慢，还会把配额烧光。</p>
+    <p>批量那层最值得说。代码里有一行注释：<strong>「一次批量就是用户明确的并发意图,由本批 concurrency 决定同时在途的任务数」</strong>。意思是，批量不复用全局节奏，它有自己的节拍——用户一次排了 12 个变体，他就是在说「我要它们一起出」。为了避免批量把整机打满，排空函数对批任务做了个小动作：每轮只启动<em>一个</em>批内任务，然后立刻退出本轮循环。</p>
+    <div class="code">
+      <div class="code-bar"><b>src/server.js</b><span>drainGenerationQueue（节选）</span></div>
+<pre><span class="k">while</span> (generationQueue.length) {
+  <span class="k">const</span> next = generationQueue[<span class="n">0</span>];
+  <span class="k">if</span> (next.batch) {
+    <span class="k">const</span> inFlight = batchInFlight.get(next.batch.batchId) || <span class="n">0</span>;
+    <span class="k">if</span> (inFlight &gt;= next.batch.concurrency) <span class="k">break</span>;
+  } <span class="k">else if</span> (runningGenerations &gt;= generationConcurrency) {
+    <span class="k">break</span>;
+  }
+  <span class="k">const</span> { id, batch } = generationQueue.shift();
+  queuedGenerationIds.delete(id);
+  runningGenerations += <span class="n">1</span>;
+  processGeneration(id).finally(() =&gt; { <span class="c">/* 释放槽位 → 放行同批下一条 → 再次排空 */</span> });
+  <span class="k">if</span> (batch) <span class="k">break</span>;   <span class="c">// 批任务一轮只放一个</span>
+}</pre>
+    </div>
+    <p>这行 <code>if (batch) break</code> 看着像偷懒，实际是让批量的节拍由 <code>batchInFlight</code> 计数决定，而不是被全局循环一口气抽干。批内某个任务完成时，<code>finally</code> 里会把同批还排着的下一条重新入队——于是批量的推进变成「完成一个，放一个」，节奏稳定，也不会因为一次点了 12 张就把整台机器塞死。</p>
+
+    <h3>时间去哪了</h3>
+    <p>每条记录都记三个时间：<code>queuedAt</code>、<code>startedAt</code>、<code>completedAt</code>，外加一个 <code>queueDurationMs</code>。这不是为了做漂亮的统计图，是为了回答一个用户一定会问的问题：「为什么我点了之后等了两分钟才出图？」</p>
+    <p>答案分三种，而三者的改法完全不同：</p>
+    <ul>
+      <li><strong>队列时间长</strong>：并发太低，或者前面有一个慢任务卡着。改并发或改渠道。</li>
+      <li><strong>运行时间长</strong>：上游慢。换渠道，或者调低该模型的超时。今天那个 306 秒就是这一类。</li>
+      <li><strong>两者都短但总感觉慢</strong>：前端轮询间隔的问题。列表默认靠 TanStack Query 轮询，间隔和缓存策略决定了「已经好了但你还看着旧状态」的那几秒。</li>
+    </ul>
+    <div class="note"><b>一次真实的账：</b>五张图、单条串行、渠道限并发 1。耗时分别是 306 / 74 / 82 / 83 / 75 秒，合计 620 秒，约 10 分 20 秒。如果那天三条并发都被接受，理论总时长会接近最慢那张的 306 秒——但事实是两条被 429 拒掉，重发之后总时长反而更长。<strong>在限流面前，「理论并发收益」是个负数。</strong></div>
+
+    <h3>取消的账</h3>
+    <p>第 1 章说过取消有三种时态。在队列这里，它还有一个更反直觉的性质：<strong>取消不会提前释放并发槽。</strong></p>
+    <p>因为取消的实现是「打个标记」——<code>cancelledGenerationIds.add(id)</code>，然后把记录改成 <code>cancelled</code>。真正的 HTTP 请求还在飞，<code>processGeneration</code> 的 Promise 还没 resolve，槽位就还占着。等上游把图吐回来，代码检查标记，丢弃结果，<code>finally</code> 才释放槽位。</p>
+    <p>为什么不直接 abort？因为对生图接口 abort 并不能让上游停止计费，反而可能让某些中转报出更难看的错误；而且 abort 之后你连「它到底出没出图」都不知道了。留着请求跑完、只丢结果，是更诚实、也更省事的选择。</p>
+    <p>下面这枚小样把这套调度摊开。拖任务数和并发，看总时长怎么变；点任意一根条可以「取消」，然后注意一件事——<em>总时长一格都不会变。</em></p>
+  </div>
+
+  <div class="demo" id="demo-queue">
+    <div class="demo-head">
+      <span class="demo-tag">DEMO 02</span>
+      <span class="demo-title">队列预算台 <span class="hint">点条子可以取消，看总时长变不变</span></span>
+    </div>
+    <div class="demo-body">
+      <div class="controls">
+        <div class="ctl">
+          <label for="q-count">任务数 <b id="q-count-v">6</b></label>
+          <input id="q-count" type="range" min="1" max="18" step="1" value="6"/>
+        </div>
+        <div class="ctl">
+          <label for="q-conc">全局并发 <b id="q-conc-v">2</b></label>
+          <input id="q-conc" type="range" min="1" max="6" step="1" value="2"/>
+        </div>
+        <div class="ctl">
+          <label for="q-base">单张基准耗时 <b id="q-base-v">60s</b></label>
+          <input id="q-base" type="range" min="20" max="120" step="5" value="60"/>
+        </div>
+        <label class="switch"><input id="q-limit1" type="checkbox"/>渠道限「每用户 1 并发」</label>
+      </div>
+      <div class="q-grid">
+        <div>
+          <div class="gantt" id="q-gantt" aria-label="任务时间线"></div>
+          <div class="big-num" style="margin-top:12px">
+            <div>总时长<b><em id="q-total">0</em>s</b></div>
+            <div>峰值在途<b id="q-peak">0</b></div>
+            <div>末位等待<b id="q-wait">0s</b></div>
+            <div>被取消<b id="q-cancel">0</b></div>
+          </div>
+          <p class="hintline" id="q-note">横轴是时间；每行一个任务。琥珀 = 立刻开始，青 = 排过队，斜纹 = 已取消但结果丢弃。</p>
+        </div>
+        <div class="q-side">
+          <div class="row"><span>排空策略</span><b>队首优先</b></div>
+          <div class="row"><span>槽位释放</span><b>Promise finally</b></div>
+          <div class="row"><span>取消</span><b>打标记，不 abort</b></div>
+          <div class="row"><span>耗时模型</span><b>±40% 抖动</b></div>
+          <div class="legend">
+            <span><i style="background:#d9a441"></i>立刻开始</span>
+            <span><i style="background:#4e7d73"></i>排过队</span>
+            <span><i style="background:#7a3527"></i>已取消</span>
+          </div>
+          <p class="hintline" style="margin-top:12px">耗时抖动用固定种子生成，同一组参数每次结果一致——这是小样，不是压测。</p>
+        </div>
+      </div>
+    </div>
+    <div class="demo-foot"><b>读法</b>：勾上「限 1 并发」后把并发拖到 6，你会看到总时长不动——多出来的并发只会在真实渠道那里变成 429，而这里直接不给你发。取消也一样：标记变了，机器时间没变。</div>
+  </div>
+</section>
+
+<section class="chapter" id="ch4">
+  <div class="ch-head">
+    <div class="ch-num">SCENE<b>04</b></div>
+    <div class="ch-title">
+      <h2>一张图的完整旅程</h2>
+      <p>上游把图给你，只是把负片交到你手上。定影、冲洗、编号、入库——后面的活才决定它能不能被找到。</p>
+    </div>
+  </div>
+  <div class="ch-body">
+    <p class="lede">本机上唯一一张真正生成成功的图，是一张 4 行 6 列的聊天表情包总图。提示词第一句写得很清楚：「生成一张 <strong>3840×2160</strong>、16:9 的单张完整表情包」。请求里 <code>size</code> 传的是 <code>auto</code>——让上游按模型默认值决定。回来的文件是 <strong>1448×1086</strong>。</p>
+    <p>这个差距没有被隐藏。记录里存了真实的宽高和 sha256，所以任何人打开这条记录，都会立刻看到「你要的和你要到的」是两件事。这是这一章想说的事：<strong>落盘不是把字节写进磁盘，是把一次不可复现的调用变成一份可以被复查的证据。</strong></p>
+
+    <h3>上游会以两种方式交图</h3>
+    <p>OpenAI 兼容的生图接口有两种返回形态，这个项目两种都得接：</p>
+    <ul>
+      <li><code>b64_json</code>：图片直接内联在 JSON 里。优点是省一次下载；缺点是响应体可能巨大，而且解码前没有任何机会检查它是什么。</li>
+      <li><code>url</code>：返回一个临时地址，需要客户端自己下载。优点是响应轻；缺点是那个地址可能在几秒后失效，也可能指向一个你完全不该信任的域名。</li>
+    </ul>
+    <p>两条路都设了硬上限，而且上限不是随手写的：base64 <strong>字符串</strong>超过 45MB 拒绝，解码后的 <strong>buffer</strong> 超过 30MB 拒绝。两个数字不同，是因为 base64 有约 4/3 的编码膨胀——一个 30MB 的图，字符串大约 40MB。先卡字符串是为了在解码前就挡住内存炸弹，再卡 buffer 是为了挡住「字符串合法但内容超限」的边界情况。</p>
+    <p>URL 那条路的检查更密。协议只允许 http/https；mime 必须以 <code>image/</code> 开头；<code>content-length</code> 超过 30MB 直接拒；而且下载是流式的——一边读一边累加，超过 30MB 立刻中断，不等读完。</p>
+
+    <h3>为什么偏偏要拒绝 SVG</h3>
+    <p>这一行是整章里最不起眼、也最要紧的一行：</p>
+    <div class="code">
+      <div class="code-bar"><b>src/provider-service.js</b><span>downloadRemoteImage</span></div>
+<pre><span class="k">const</span> mime = (response.headers.get(<span class="s">'content-type'</span>) || <span class="s">'image/png'</span>).split(<span class="s">';'</span>)[<span class="n">0</span>];
+<span class="k">if</span> (!mime.startsWith(<span class="s">'image/'</span>) || mime === <span class="s">'image/svg+xml'</span>) {
+  <span class="k">throw</span> apiError(<span class="s">'IMAGE_MIME_INVALID'</span>, <span class="s">'上游返回的不是安全位图'</span>, <span class="n">502</span>);
+}</pre>
+    </div>
+    <p>SVG 是 XML，XML 可以带 <code>&lt;script&gt;</code>。而这张图接下来会被保存到 <code>data/generated/</code>，再通过同源的 <code>/media/</code> 路径发回浏览器。如果允许 SVG 进来，一个恶意上游就能借你的域名执行脚本——一个「生图工具」变成了存储型 XSS 的跳板。同源是这里的关键：不是「SVG 危险」，是「我们把它放回了自己的域名下」。</p>
+    <div class="note"><b>一个例外：</b>本地演示适配器（<code>adapter:'demo'</code>）生成的占位图就是 SVG，由服务端自己拼字符串产出，不经过这条外部 mime 检查。区别在于它是自己写的，不是别人给的。「同源」在信任自己产出时是优点，在信任上游时是弱点。</div>
+
+    <h3>落盘：先写临时文件，再改名</h3>
+    <p>图片文件名是 <code>crypto.randomUUID()</code> 加扩展名。不用标题、不用时间戳、不用提示词——因为那些都可能包含非法字符、超长、或者重名。UUID 的唯一要求是「不重复」，而它做到了。</p>
+    <p>写入用的是一套两段式：</p>
+    <div class="code">
+      <div class="code-bar"><b>src/server.js</b><span>atomicWrite</span></div>
+<pre><span class="k">async function</span> atomicWrite(file, buffer) {
+  <span class="k">const</span> temp = file + <span class="s">'.'</span> + process.pid + <span class="s">'.tmp'</span>;
+  <span class="k">await</span> fs.promises.writeFile(temp, buffer);
+  <span class="k">await</span> fs.promises.rename(temp, file);
+}</pre>
+    </div>
+    <p>临时文件名带 pid，是为了两个进程（或两次启动）同时写同一个目标时不互相踩。rename 在同一文件系统内是原子操作，所以对读取方来说，<code>f5b15a20….png</code> 要么不存在，要么是完整的——永远不会出现「文件存在但只有一半」的中间态。这对一个会被浏览器直接 <code>&lt;img&gt;</code> 拉取的目录来说，是底线。</p>
+    <p>元数据走的是另一套原子性：整个 <code>db.json</code> 被序列化成快照，写进临时文件，再 rename。所有写入串成一条 Promise 链，链头上挂一个 <code>.catch(() =&gt; {})</code>——这样某一次写失败不会毒化整条链，后面的写入还能继续。</p>
+    <div class="code">
+      <div class="code-bar"><b>src/store.js</b><span>#persist</span></div>
+<pre><span class="k">async</span> #persist() {
+  <span class="k">const</span> snapshot = JSON.stringify(<span class="k">this</span>.db, <span class="k">null</span>, <span class="n">2</span>);
+  <span class="k">this</span>.writeQueue = <span class="k">this</span>.writeQueue.catch(() =&gt; {}).then(<span class="k">async</span> () =&gt; {
+    <span class="k">const</span> temp = <span class="s">`${config.dbFile}.${process.pid}.tmp`</span>;
+    <span class="k">await</span> fs.promises.writeFile(temp, snapshot, <span class="s">'utf8'</span>);
+    <span class="k">await</span> fs.promises.rename(temp, config.dbFile);
+  });
+  <span class="k">return</span> <span class="k">this</span>.writeQueue;
+}</pre>
+    </div>
+    <p>读的时候也不能客气。启动时会校验根节点是对象、五个集合字段是数组、<code>settings</code> 是对象；任何一条不满足，就不启动，并抛出一个明确说「原文件已保留，请修复或从备份恢复」的错误。宁可开不了机，也不要带着一份被误解的数据跑起来——那会让后面每一条记录都变成嫌疑犯。</p>
+
+    <h3>缩略图：一个可以失败的优化</h3>
+    <p>图库列表不加载原图。每张图在落盘后会预热一张 640px 宽的 WebP，质量 72，effort 3；启动时回填历史图片，请求时按需补齐。列表接口只返回缩略图路径，点开大图才取原图。</p>
+    <p>但 sharp 是可选依赖。它在某些平台缺预编译包，加载会失败。这套代码的处理是：<code>import('sharp').then(m =&gt; m.default).catch(() =&gt; null)</code>，拿不到就返回空字符串，所有接口静默降级为原图。同理，缩略图生成过程中的任何异常都被吞掉，返回空串。</p>
+    <p>这不是「错误处理写得马虎」，是一个刻意的分级：<strong>缩略图是性能优化，不是功能。</strong>它失败时，用户应该看到慢一点的图库，而不是一个报错页面。区分「可以失败的优化」和「不可以失败的功能」，比给每个 catch 都加日志更重要。</p>
+    <p>还有一个小细节：同一张图的缩略图生成请求会被 <code>inFlight</code> 这张 Map 合并。列表一次请求 20 条、其中 5 条都缺缩略图时，sharp 只会被调用 5 次，不是 20 次。并发去重在这里比任何缓存都值钱，因为生成只需要几十毫秒，重复生成却会同时占满 CPU。</p>
+
+    <figure class="fig">
+      <div class="frame"><img src="assets/art/develop.webp" alt="暗房显影盘特写：一张相纸浸在显影液里，左半已经浮出城市与河流的影像，右半仍是空白，液面有琥珀色安全灯的反光" width="1024" height="1024"/></div>
+      <figcaption><b>FIG. 03</b>显影的中间态是危险的：一半有影、一半空白。落盘的原子性就是为了永远不把这种半成品交出去。</figcaption>
+    </figure>
+
+    <h3>把「你要的」和「你要到的」记在一起</h3>
+    <p>回到那张表情包。记录里同时躺着两组数字：请求的 <code>size: "auto"</code>，和实际的 <code>width: 1448, height: 1086</code>。前者是意图，后者是事实。这个项目没有试图让两者一致——它只是把两者都存了下来，然后让 UI 在需要的时候显示事实。</p>
+    <div class="rec-card">
+      <div class="rc-top"><span>GENERATION</span><b>626a361b</b></div>
+      <div class="rc-body">
+        <div class="rc-row"><span>PROMPT</span><b>生成一张 3840×2160、16:9 的单张完整表情包总图：4行×6列共24格……</b></div>
+        <div class="rc-row"><span>SIZE 请求</span><b class="hot">auto</b></div>
+        <div class="rc-row"><span>实际像素</span><b>1448 × 1086</b></div>
+        <div class="rc-row"><span>文件</span><b>f5b15a20….png · 1,816,647 B</b></div>
+        <div class="rc-row"><span>SHA-256</span><b>3ecb5f1b…c48bb5</b></div>
+        <div class="rc-row"><span>耗时</span><b>排队 + 生成，分两段记</b></div>
+      </div>
+    </div>
+    <p>这张记录不是装饰。它是这个工具敢不敢说「我生成过」的唯一凭据：文件在不在、多大、什么哈希、多少像素、花了多久、走的哪条渠道。缺任何一项，「生成成功」都只是一句自述。</p>
+  </div>
+</section>
+
+<section class="chapter" id="ch5">
+  <div class="ch-head">
+    <div class="ch-num">SCENE<b>05</b></div>
+    <div class="ch-title">
+      <h2>打不过就换一条路</h2>
+      <p>降级不是「失败了再试一次」。降级是一张表格：哪种错值得换路，哪种错换了也白换。</p>
+    </div>
+  </div>
+  <div class="ch-body">
+    <p class="lede">这一章是全篇最像代码的一章，因为它讲的就是一张 <code>if</code> 表。这张表决定了：当主力渠道吐出一个非 200，系统是原地不动、换接口格式、还是换一条渠道。<strong>错的表不会报错，只会静默地把任务拖死。</strong></p>
+    <p>先看两张表。第一张是「不换渠道」的白名单，命中就立刻抛：</p>
+    <div class="code">
+      <div class="code-bar"><b>src/provider-service.js</b><span>generateImage · 不降级名单</span></div>
+<pre><span class="c">// 渲染失败/参数错误不降级;网络与上游错误时自动切到下一个含生图模型的渠道重试一次</span>
+<span class="k">if</span> (!failover || [
+  <span class="s">'PROVIDER_REQUIRED'</span>, <span class="s">'MODEL_REQUIRED'</span>, <span class="s">'PROVIDER_NOT_CONFIGURED'</span>,
+  <span class="s">'IMAGE_TOO_LARGE'</span>, <span class="s">'IMAGE_RESPONSE_UNSUPPORTED'</span>, <span class="s">'IMAGE_MIME_INVALID'</span>,
+  <span class="s">'IMAGE_URL_INVALID'</span>, <span class="s">'PROVIDER_AUTH_FAILED'</span>
+].includes(error?.code)) <span class="k">throw</span> error;</pre>
+    </div>
+    <p>理由是分类：前三个是「你根本没配好」，换渠道也没用；中间四个是「拿到的东西不能用」，换渠道可能有救、但更可能只是把同一个问题再演一遍；最后一个是「钥匙不对」，换门也没用。</p>
+    <p>第二张表是「先试 chat 型生图」的条件：</p>
+    <div class="code">
+      <div class="code-bar"><b>src/provider-service.js</b><span>generateImageOnce · chat 降级</span></div>
+<pre><span class="k">if</span> (!response.ok) {
+  <span class="k">const</span> upstream = <span class="k">await</span> upstreamError(response, <span class="s">'IMAGE_GENERATION_FAILED'</span>, <span class="s">'图片生成失败'</span>);
+  <span class="c">// 鉴权错误换端点也没用，直接抛；其余错误（404/500 端点无路由、渠道缺失等）降级到 chat 型生图</span>
+  <span class="k">if</span> ([<span class="n">401</span>, <span class="n">402</span>, <span class="n">403</span>].includes(response.status)) <span class="k">throw</span> upstream;
+  <span class="k">if</span> (!mask) {
+    <span class="k">try</span> {
+      <span class="k">const</span> chatResult = <span class="k">await</span> generateImageViaChat({ <span class="c">/* … */</span> });
+      <span class="k">if</span> (chatResult) <span class="k">return</span> chatResult;
+    } <span class="k">catch</span> {
+      <span class="c">// 降级失败时以原始 /images 错误为准，避免掩盖真实原因</span>
+    }
+  }
+  <span class="k">throw</span> upstream;
+}</pre>
+    </div>
+    <p>这段代码值得逐句读。注意三件事：</p>
+    <ol>
+      <li><strong>有蒙版就不试 chat。</strong>局部重绘传的是一个 PNG 蒙版，chat 接口没有地方放它。与其发一个没有蒙版的请求得到一张完全不对的图，不如老实失败。</li>
+      <li><strong>chat 失败时抛的是原始错误。</strong>不是 chat 的错误。因为用户关心的是「为什么我的 /images 调用没成」，而不是「备用方案也没成」——后者只是信息，前者才是原因。</li>
+      <li><strong>这段注释和实际行为有一处偏差。</strong>注释说鉴权错误「直接抛」，但抛出去的是一个 <code>IMAGE_GENERATION_FAILED</code>，它并不在上一张白名单里。所以 401 依然会被外层接住、换一个渠道再试。真正不做的是 chat 降级。<em>读代码时，注释描述意图，错误码决定行为；两者不一致时，以错误码为准。</em></li>
+    </ol>
+
+    <h3>为什么需要一个 chat 降级</h3>
+    <p>因为有一类中转站，只把生图模型挂在 <code>/chat/completions</code> 上。<code>/v1/images/generations</code> 要么 404，要么返回 200 但 <code>data</code> 是空的。这类站的前端就是把图当消息发出来的，所以图片藏在消息里——可能是 <code>message.images[].image_url.url</code>，可能是 Markdown 里的 <code>![](data:image/png;base64,…)</code>，可能是一段裸的 <code>https://…png</code>。</p>
+    <p>解析器四种都认，按顺序试：结构化字段 → Markdown 图片 → 内联 data URI → 裸 URL。取到之后仍然走同一套 mime 与大小检查。降级的代价是丢参数：<code>seed</code> 和 <code>guidance_scale</code> 没法经 chat 传递，尺寸只能作为一句话附加在提示词后面（「图片输出尺寸约 1024×1024」）。这是有损降级，代码里也写明了「尽力而为」。</p>
+
+    <h3>一张表，七种结局</h3>
+    <p>把两张表合起来，就得到一个有点残酷的矩阵。假设每次都备了另一条健康渠道：</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>上游返回</th><th>试 chat？</th><th>抛出的码</th><th>换渠道？</th><th>用户看到</th></tr></thead>
+        <tbody>
+          <tr><td class="num">401 / 402 / 403</td><td>否</td><td><code>IMAGE_GENERATION_FAILED</code></td><td><b>会</b></td><td>可能被备用渠道救回</td></tr>
+          <tr><td class="num">404 / 405</td><td>是（无蒙版）</td><td><code>IMAGE_GENERATION_FAILED</code></td><td><b>会</b></td><td>可能先被 chat 救、再被渠道救</td></tr>
+          <tr><td class="num">429 / 500</td><td>是（无蒙版）</td><td><code>IMAGE_GENERATION_FAILED</code></td><td><b>会</b></td><td>同上</td></tr>
+          <tr><td class="num">200 但无图</td><td>是（无蒙版）</td><td><code>IMAGE_RESPONSE_UNSUPPORTED</code></td><td><b>不会</b></td><td>直接失败，白名单拦住</td></tr>
+          <tr><td class="num">200，图 &gt; 30MB</td><td>—</td><td><code>IMAGE_TOO_LARGE</code></td><td><b>不会</b></td><td>直接失败，尺寸是硬约束</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>最后一行是这张表里唯一一个反直觉的洞：<strong>「返回 200 但没有图片」不会触发换渠道。</strong>因为它被判成 <code>IMAGE_RESPONSE_UNSUPPORTED</code>——「你选的这个模型不支持这种返回」，属于配置问题，不属于网络问题。可现实中它更常见的原因是「这条渠道今天就是不给你图」。这个判定的代价是：那条渠道会一直占着主力位置，而每一次生成都失败在同一行代码上。</p>
+    <div class="pull">降级的价值不在「多试一次」，而在<b>把错误分对类</b>。分错的后果不是崩，是稳定地错——每一次都失败得很干净，让你以为这就是世界的极限。</div>
+
+    <h3>十分钟一次的巡检</h3>
+    <p>上面那条路是「请求内的降级」。系统还有一条「请求外的」：定时巡检。</p>
+    <p>每 10 分钟（第一次在启动后 30 秒），服务端会把 <code>roles</code> 里登记过的每个角色拿出来，向对应渠道发一次 <code>GET {base}/models</code>，8 秒超时。如果<strong>生图主力</strong>检查失败，且没有被锁定，就从历史体检结果里挑「生图模型最多」的健康渠道接管，模型取它的第一个生图模型，写回 <code>roles</code>，并把这条切换记进事件列表（最多留 20 条）。</p>
+    <p>这套逻辑保守得近乎笨拙：只看 <code>/models</code> 通不通，只看模型数量最多，不看延迟、不看成功率、不看它到底能不能出图。但它有一个巨大的好处——无状态、可解释、失败时不会做出更坏的猜测。在私人工具里，「可解释的笨办法」永远优于「不可解释的聪明办法」。</p>
+    <div class="note"><b>它抓不到什么：</b>今天我撞的那个 429，巡检一辈子都发现不了。<code>/models</code> 返回 200，清单一切正常，只是「你同时发三个我就不干活」。这类「活着但拒绝服务」的渠道，只能靠请求内的 429 处理，或者靠人去把并发调成 1。巡检是探活，不是探服务质量。</div>
+
+    <figure class="fig">
+      <div class="frame"><img src="assets/art/restore.webp" alt="深色木桌上摆着一台老式收音机，调谐指针停在刻度上，背景虚化处有夜景城市与一台发着青光的电脑屏幕" width="1024" height="1024"/></div>
+      <figcaption><b>FIG. 04</b>巡检像调台：你只能确认这个频率有声音，不能确认它今天播的是不是你想听的节目。</figcaption>
+    </figure>
+
+    <h3>自己走一遍这张表</h3>
+    <p>下面的小样把两条降级链摊开：内层的 chat 降级、外层的换渠道。切换返回码、开关蒙版与备用渠道，看每一步的判决。特别建议看一眼「200 但无图」那一格——那是这张表里唯一的死路。</p>
+  </div>
+
+  <div class="demo" id="demo-fallback">
+    <div class="demo-head">
+      <span class="demo-tag">DEMO 03</span>
+      <span class="demo-title">降级链 <span class="hint">换一个返回码，看这条路走不走得通</span></span>
+    </div>
+    <div class="demo-body">
+      <div class="controls">
+        <div class="ctl" style="min-width:260px">
+          <label>主力渠道 /images 返回</label>
+          <div class="seg" id="fb-status">
+            <button type="button" data-s="401">401</button>
+            <button type="button" data-s="402">402</button>
+            <button type="button" data-s="403">403</button>
+            <button type="button" data-s="404">404</button>
+            <button type="button" data-s="429" aria-pressed="true">429</button>
+            <button type="button" data-s="500">500</button>
+            <button type="button" data-s="200">200空</button>
+          </div>
+        </div>
+        <label class="switch"><input id="fb-mask" type="checkbox"/>带蒙版（局部重绘）</label>
+        <label class="switch"><input id="fb-backup" type="checkbox" checked/>有备用渠道</label>
+        <label class="switch"><input id="fb-chatfails" type="checkbox" checked/>chat 接口也拿不到图</label>
+      </div>
+      <div class="chain" id="fb-chain"></div>
+      <div class="verdict-box" id="fb-verdict"></div>
+    </div>
+    <div class="demo-foot"><b>依据</b>：<code>generateImageOnce</code> 内层判 401/402/403 跳过 chat；<code>!mask</code> 才试 chat；外层 <code>generateImage</code> 用错误码白名单决定是否换渠道。备用渠道取「生图模型数最多」的那一条，只重试一次。</div>
+  </div>
+</section>
+
+<section class="chapter" id="ch6">
+  <div class="ch-head">
+    <div class="ch-num">SCENE<b>06</b></div>
+    <div class="ch-title">
+      <h2>谁写了这句话</h2>
+      <p>一张图旁边的那段提示词，可能是作者写的，可能是它的工具写的，也可能是你的视觉模型看了一眼之后猜的。这三件事不能共用一个字段。</p>
+    </div>
+  </div>
+  <div class="ch-body">
+    <p class="lede">图库里最常见的一个动作是「复制提示词」。这个动作隐含一个假设：提示词是作者写的。可现实里它有三个来源——生成工具写进 PNG 的参数块、作者手填的说明、以及模型看图反推出来的猜测。三者的可信度差着一个数量级，混在一起，就是这套系统开始撒谎的地方。</p>
+
+    <h3>PNG 里藏着一个时代</h3>
+    <p>PNG 允许携带若干文本块：<code>tEXt</code>（不压缩）、<code>zTXt</code>（zlib 压缩）、<code>iTXt</code>（国际化，可指定语言与翻译）。Stable Diffusion 生态把这套机制用成了一种约定俗成的元数据格式，于是今天一张 AI 图里可能同时躺着三套互不兼容的方言。</p>
+    <p>读取器是手写的，不依赖任何图像库：从 PNG 签名开始，逐块读长度与类型，遇到 <code>tEXt</code> 取 key\0value，遇到 <code>zTXt</code> 用 zlib 解压。两个上限：单个 chunk 超过 16MB 停止，所有文本累计超过 2MB 停止。解压还带了 <code>maxOutputLength</code>——这是防 zip bomb 的，一个 1KB 的压缩块可以膨胀成 1GB，必须在解压时就掐死，而不是解完再检查。</p>
+    <div class="code">
+      <div class="code-bar"><b>src/image-metadata.js</b><span>readPngText（节选）</span></div>
+<pre><span class="k">if</span> (type === <span class="s">'zTXt'</span>) {
+  <span class="k">const</span> zero = data.indexOf(<span class="n">0</span>);
+  <span class="k">if</span> (zero &gt; <span class="n">0</span> &amp;&amp; data[zero + <span class="n">1</span>] === <span class="n">0</span>) {
+    <span class="k">const</span> expanded = zlib.inflateSync(data.subarray(zero + <span class="n">2</span>), {
+      maxOutputLength: maxTextBytes - textBytes
+    });
+    textBytes += expanded.length;
+    <span class="k">if</span> (textBytes &gt; maxTextBytes) <span class="k">break</span>;
+    result[data.toString(<span class="s">'latin1'</span>, <span class="n">0</span>, zero)] = expanded.toString(<span class="s">'utf8'</span>);
+  }
+}</pre>
+    </div>
+
+    <h3>三种方言，一个出口</h3>
+    <p>三套格式的解析难度差很远：</p>
+    <ul>
+      <li><strong>A1111</strong>：纯文本，三段结构——正向提示词、<code>Negative prompt:</code> 之后是负向、最后一行 <code>Steps: 28, Sampler: Euler a, CFG scale: 7, Seed: 12345, Size: 1024x1024</code>。用两个正则定出边界，再把参数行按逗号切成键值对。这是最容易、也最常见的一种。</li>
+      <li><strong>ComfyUI</strong>：<code>prompt</code> 字段是一整张节点图，JSON。要从中找出 <code>KSampler</code> 类节点，顺着它的 <code>positive</code>/<code>negative</code> 输入追溯上游，才能拿到那两段文本。它记录的不是「提示词」，是「这张图怎么被算出来的」。</li>
+      <li><strong>InvokeAI</strong>：<code>sd-metadata</code> / <code>invokeai_metadata</code> 里是结构化 JSON，字段名与 A1111 不同，正负向和参数都在不同键下。</li>
+    </ul>
+    <p>三个解析器最后都收敛到同一个出口：<code>finalizePromptResult()</code>，产出 <code>exact: true, inferred: false, source: 'AUTOMATIC1111 PNG Info' | 'ComfyUI workflow' | 'InvokeAI metadata'</code>。<strong>exact 的意思是「这段文字是从文件里读出来的，不是想出来的」</strong>，不是「这段文字一定生成了这张图」。</p>
+    <div class="note"><b>这个区别很重要。</b>PNG 里的参数块是自述。一台生成工具写什么，文件里就是什么，没有任何机制核对它真的用那段提示词算出了这张图。所以「exact」只保证来源，不保证因果。</div>
+
+    <h3>读不到的时候，说读不到</h3>
+    <p>没有元数据的图占多数。微信、截图、二次压缩、格式转换，任何一步都能把文本块抹掉。这时候系统有两条路：</p>
+    <ol>
+      <li><strong>有视觉模型</strong>：把图发给它，要求返回 JSON（<code>prompt</code> / <code>negativePrompt</code> / <code>keywords</code> / <code>style</code>），并明确要求「不要声称这是作者原始提示词」。结果标为 <code>exact: false, inferred: true</code>，界面上写「AI 推测，不是作者原始提示词」。</li>
+      <li><strong>没有视觉模型</strong>：<code>usable: false</code>，附一段人话说明「当前服务无法调用视觉模型反推；请切换到真实 Provider，或上传带 A1111 / ComfyUI / InvokeAI 参数的 PNG」。不编，不空着，也不假装成功。</li>
+    </ol>
+    <p>我更愿意把这两条路看成同一件事的两个档位：<strong>系统可以有不知道的东西，但不能有不知道却不说的地方。</strong>一个空的 prompt 字段和一个标着「推测」的 prompt 字段，对用户的含义完全不同；前者让人以为坏了，后者让人知道该信几分。</p>
+
+    <h3>润色：一个必须返回 JSON 的模型</h3>
+    <p>提示词润色走的是文本模型。<code>system</code> 提示里把要求写死：保留主体与意图，补充构图、环境、光线、镜头、材质和色彩；不要添加冲突主体；<strong>返回且只返回 JSON</strong>，字段为 <code>polishedPrompt</code>、<code>negativePrompt</code>、<code>keywords</code>；并且特别强调 <code>polishedPrompt</code> 必须是「一段完整、独立、可直接提交给图像生成接口的正向提示词」，不能只给标题或关键词摘要。</p>
+    <p>最后那句是为了治一个很常见的病：模型被要求「润色」时，很喜欢返回一句总结式的标题，或者一串关键词，看着漂亮，丢进生图接口就废了。</p>
+    <p>解析端做了三层容错：</p>
+    <div class="code">
+      <div class="code-bar"><b>src/provider-service.js</b><span>parseJsonObject</span></div>
+<pre><span class="k">function</span> parseJsonObject(value) {
+  <span class="k">const</span> text = String(value || <span class="s">''</span>).trim()
+    .replace(<span class="s">/^\x60\x60\x60(?:json)?/i</span>, <span class="s">''</span>)   <span class="c">// 去掉开头的 ``` 或 ```json</span>
+    .replace(<span class="s">/\x60\x60\x60$/</span>, <span class="s">''</span>)                <span class="c">// 去掉结尾的 ```</span>
+    .trim();
+  <span class="k">try</span> { <span class="k">return</span> JSON.parse(text); } <span class="k">catch</span> {}
+  <span class="k">const</span> start = text.indexOf(<span class="s">'{'</span>);
+  <span class="k">const</span> end = text.lastIndexOf(<span class="s">'}'</span>);
+  <span class="k">if</span> (start &gt;= <span class="n">0</span> &amp;&amp; end &gt; start) {
+    <span class="k">try</span> { <span class="k">return</span> JSON.parse(text.slice(start, end + <span class="n">1</span>)); } <span class="k">catch</span> {}
+  }
+  <span class="k">return</span> <span class="k">null</span>;
+}</pre>
+    </div>
+    <p>第一层剥 Markdown 围栏，第二层从第一个 <code>{</code> 截到最后一个 <code>}</code>——很多模型会在 JSON 前后加一句「好的，以下是润色结果：」。第三层是字段名归一化：<code>polishedPrompt</code>、<code>polished_prompt</code>、<code>positivePrompt</code>、<code>prompt</code>、<code>enhancedPrompt</code> 都认，还会往 <code>data</code>/<code>result</code>/<code>output</code>/<code>content</code> 里再找一层。</p>
+    <p>全都失败呢？退回本地规则：把原提示词压掉多余空白，接上该风格的一串短语，再给一份固定负向词表。返回值里 <code>source</code> 从 <code>remote-text</code> 变成 <code>local-rules</code> 或 <code>remote-text-fallback</code>。界面上不隐瞒这个差别——你一眼就能看出这段「润色」是模型写的，还是模板拼的。</p>
+
+    <figure class="fig">
+      <div class="frame"><img src="assets/art/curate.webp" alt="俯拍暗色桌面：左侧一叠散乱的老照片，右侧四张空白卡片整齐排成一列，一把镊子正夹着其中一张照片移向卡片" width="1024" height="1024"/></div>
+      <figcaption><b>FIG. 05</b>整理照片的动作，和给记录填来源的动作是同一件事：先分清哪些是自己拍的，哪些是别人给的。</figcaption>
+    </figure>
+
+    <h3>自己翻一遍账本</h3>
+    <p>下面这枚小样有两个模式。左边选「读图」，切五种来源，看 <code>exact</code> / <code>inferred</code> / <code>usable</code> 三个开关怎么翻；左边选「润色」，切四种模型返回形态，看解析器在哪一层接住它、接不住时退回哪里。</p>
+  </div>
+
+  <div class="demo" id="demo-ledger">
+    <div class="demo-head">
+      <span class="demo-tag">DEMO 04</span>
+      <span class="demo-title">元数据账本 <span class="hint">谁写的，写在哪一栏</span></span>
+    </div>
+    <div class="demo-body">
+      <div class="controls">
+        <div class="ctl" style="min-width:200px">
+          <label>模式</label>
+          <div class="seg" id="lg-mode">
+            <button type="button" data-m="read" aria-pressed="true">读图</button>
+            <button type="button" data-m="polish">润色</button>
+          </div>
+        </div>
+        <div class="ctl" style="min-width:280px" id="lg-src-wrap">
+          <label>PNG 里的文本来源</label>
+          <div class="seg" id="lg-src">
+            <button type="button" data-s="a1111" aria-pressed="true">A1111</button>
+            <button type="button" data-s="comfy">ComfyUI</button>
+            <button type="button" data-s="invoke">InvokeAI</button>
+            <button type="button" data-s="desc">说明文字</button>
+            <button type="button" data-s="none">无文本</button>
+          </div>
+        </div>
+        <div class="ctl" style="min-width:280px;display:none" id="lg-shape-wrap">
+          <label>文本模型返回</label>
+          <div class="seg" id="lg-shape">
+            <button type="button" data-s="clean" aria-pressed="true">规范 JSON</button>
+            <button type="button" data-s="fence">```json 围栏</button>
+            <button type="button" data-s="chatty">解释 + JSON</button>
+            <button type="button" data-s="prose">纯文本</button>
+          </div>
+        </div>
+        <label class="switch" id="lg-vision-wrap"><input id="lg-vision" type="checkbox"/>配置了视觉模型</label>
+      </div>
+      <div class="ledger-grid">
+        <div class="ledger-in">
+          <label id="lg-raw-label">文件里的原始文本（节选）</label>
+          <div class="mono-block" id="lg-raw"></div>
+          <p class="hintline" id="lg-raw-note"></p>
+        </div>
+        <div class="ledger-out">
+          <div class="lh"><span>RECORD</span><span id="lg-flag"></span></div>
+          <div id="lg-rows"></div>
+          <div class="notice" id="lg-notice" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+    <div class="demo-foot"><b>依据</b>：解析顺序为 A1111 → ComfyUI → InvokeAI → 通用描述字段；都失败才走视觉反推。润色解析为剥围栏 → 花括号截取 → 字段归一化 → 本地规则兜底。</div>
+  </div>
+</section>
+
+<section class="chapter" id="ch7">
+  <div class="ch-head">
+    <div class="ch-num">SCENE<b>07</b></div>
+    <div class="ch-title">
+      <h2>怎么证明它没撒谎</h2>
+      <p>56 个测试、30 条 API 路由、一份会拒绝启动的数据校验。以及一张写清楚了「证明不了什么」的清单。</p>
+    </div>
+  </div>
+  <div class="ch-body">
+    <p class="lede">生图工具的评价标准通常是「出图好不好看」。这个标准没法测，也不该由工具自己测。能测的是另一批东西：取消有没有真的取消、写盘会不会留半张图、错误码分得对不对、key 会不会漏到前端、元数据的来源标得准不准。</p>
+
+    <h3>56 个测试，55 个是绿的</h3>
+    <p>测试用 Node 自带的 <code>node --test</code>，16 个文件 56 个用例，零测试框架依赖。跑一遍 <code>npm test</code>，结果是 <strong>55 过、1 挂</strong>。先看分布，再说那一条红的。</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>文件</th><th>它在防什么</th></tr></thead>
+        <tbody>
+          <tr><td><code>http-transport.test.js</code></td><td>代理选择、重定向跟随与跨源剥离敏感头、超时</td></tr>
+          <tr><td><code>image-metadata.test.js</code></td><td>三套方言的解析、压缩块膨胀上限</td></tr>
+          <tr><td><code>store.test.js</code></td><td>损坏的 db.json 必须拒绝启动、原子写不产生半份文件</td></tr>
+          <tr><td><code>task-cancel.test.js</code></td><td>取消的三种时态、已结束任务不可取消（409）</td></tr>
+          <tr><td><code>batch.test.js</code></td><td>批内并发计数、批完成后放行下一条</td></tr>
+          <tr><td><code>video-flow.test.js</code></td><td>远端任务 ID 的多种字段、状态归一化、续接轮询</td></tr>
+          <tr><td><code>site-relay.test.js</code></td><td>SSE 帧解析、从事件里捞出图片地址</td></tr>
+          <tr><td><code>zip-service.test.js</code></td><td>自写 ZIP 的 CRC32 与目录结构</td></tr>
+          <tr><td><code>provider-service.test.js</code></td><td>端点候选推导、能力推断、错误分类</td></tr>
+          <tr><td><code>vision-image.test.js</code> / <code>clipboard-image.test.js</code></td><td>图片压缩与剪贴板粘贴的边界</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>看名字就知道，没有一个在测「图好不好看」。它们在测的都是会静默出错的地方：一个漏掉的 <code>await</code>、一次没剥干净的重定向头、一个膨胀到 2GB 的解压块、一次「已经取消了但结果还是入库了」。</p>
+    <p>跑法就一条：<code>npm run verify</code>，先 eslint 再 <code>node --test</code>。两个都过，才算能交付。</p>
+
+    <h3>那一条红的</h3>
+    <p>2026 年 10 月 22 日在这台机器上跑了一遍，输出是这个样子的：</p>
+    <div class="code">
+      <div class="code-bar"><b>npm test</b><span>2026-10-22</span></div>
+<pre><span class="c"># tests 56</span>
+<span class="c"># pass 55</span>
+<span class="c"># fail 1</span>
+
+<span class="k">not ok</span> 34 - demo API covers providers, polish, reference upload and generation
+  <span class="s">error:</span> Expected values to be strictly equal:
+  <span class="n">3</span> !== <span class="n">1</span></pre>
+    </div>
+    <p>挂在 <code>server.test.js</code>——那条唯一会真的 <code>spawn</code> 一个服务进程、再用假上游走完「建渠道 → 取模型 → 润色 → 传参考图 → 生成 → 等完成 → 局部重绘 → 导出」全链路的端到端测试。一条计数断言期望 1，实际回来 3。</p>
+    <p>这篇里我没有修它。不是忘了，是它正好落在这一章的论点上：<strong>这套账本之所以可信，不在于它全绿，而在于它把没通过的那一项写在同一个输出里，而不是藏起来。</strong>一个把 56 报成「全部通过」、或者悄悄跳过这一条的项目，看起来更干净，但你就没法知道该信它哪一句话。</p>
+    <p>这也解释了正文里每个数字为什么都带日期。渠道数会变、生成记录会变、测试会由红转绿——写死一句「56 个测试通过」而不说哪一天，等于在补一份自己都复查不了的记录。</p>
+
+    <h3>那些没法写成测试的，就写成文字</h3>
+    <p>有些事测试测不了，只能用一份清单把它固定下来，让每次改动都被迫面对。这个项目的清单是这样的：</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>它能证明</th><th>它证明不了</th></tr></thead>
+        <tbody>
+          <tr><td>文件存在，sha256 一致，像素尺寸与记录相符</td><td>这段提示词真的生成了这张图</td></tr>
+          <tr><td>这次调用走的是哪条渠道、哪个模型</td><td>那条渠道明天还活着</td></tr>
+          <tr><td>排队用了多久、生成用了多久</td><td>模型会照提示词执行——尺寸就是反例</td></tr>
+          <tr><td>元数据来自哪个解析器（A1111 / ComfyUI / InvokeAI）</td><td>那个参数块描述的就是这张图</td></tr>
+          <tr><td>取消发生在排队、运行、还是落盘前</td><td>上游为这次取消退过款</td></tr>
+          <tr><td>key 没有出现在任何接口响应里</td><td>key 没有出现在你的截图里</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>右边这一列不是「以后要修的 bug」，是这个工具的能力边界。写下来是为了防止一件更坏的事：<strong>把「能证明」的那一列，当成「全部」。</strong>一个工具一旦相信自己的账本是完整的，它就会开始替不存在的证据说话。</p>
+
+    <h3>最诚实的一次统计</h3>
+    <p>回到开头那组数字。48 条渠道，4 条生成记录，其中 3 条失败。唯一的成功是一条表情包，提示词要 3840×2160，实际给了 1448×1086。</p>
+    <p>把这四个数字放在一起，得到的是一个不好看但准确的画像：这是一个渠道收集量远超产出量的私人工具，成功率 25%，而且它连自己最朴素的诉求（尺寸）都没能满足。</p>
+    <p>可它同时也做到了另一些事：那 3 次失败各自留下了错误码与阶段；成功的那 1 次留下了哈希、像素、耗时与渠道；今天我用它背后的同一类渠道生成了这篇文章的五张插图，被 429 拒了两次之后，它教会我的第一件事就是别并发。</p>
+    <div class="pull">「能证明」和「好看」是两套完全不同的标准。<b>一个工具选前者，不是因为它更高级，是因为前者可以被复查。</b></div>
+
+    <h3>还没解决的四个死角</h3>
+    <p>这一节按惯例留给没做完的事。它们不是路线图，是四个我知道在哪、但还没动的地方：</p>
+    <ol>
+      <li><strong>单用户假设。</strong>没有登录、没有用户隔离、<code>data/</code> 目录就是全部权限边界。局域网里别人能打开这个端口，就能看到你的全部图与全部渠道。</li>
+      <li><strong>私网访问默认开着。</strong><code>ALLOW_PRIVATE_NETWORK</code> 默认为真，因为这是本机工具、要连本机的 ComfyUI。一旦部署到公网，这个默认值就是一个 SSRF 面，必须改。</li>
+      <li><strong>JSON 库不是数据库。</strong>所有记录在一个 <code>db.json</code> 里，每次写入全量序列化。图到几百张、记录到几千条时会开始变慢，而且没有事务、没有并发控制，只有一条 Promise 链和原子 rename 撑着的「单进程正确」。</li>
+      <li><strong>渠道能力永远靠猜。</strong>模型名关键词表是硬编码的，新模型出来就得手工补。想真正解决，只能让渠道自己声明能力——而这需要上游配合，不是一个客户端能决定的。</li>
+    </ol>
+  </div>
+</section>
+
+<section class="chapter" id="closing">
+  <div class="epilogue">
+    <h2>结语：把剪刀停在半空</h2>
+    <p>写完这七章，我发现「画境」真正在做的不是生图。生图那一步只有百来行，调一个接口，解一个 base64。剩下的九千多行全部在处理「万一不是这样」：万一渠道挂了、万一返回的不是图、万一写到一半断电、万一这个提示词其实是猜的、万一用户在半路改了主意。</p>
+    <p>这些「万一」在演示里一个都看不到。演示总是顺利的：一条好渠道，一句好提示词，一次成功的生成。而一个要天天用的工具，长的是另一副样子——它的全部工程量，都长在那些用户看不见、但一定会遇到的岔路上。</p>
+
+    <div class="rules">
+      <div class="rule">
+        <b>准则一</b>
+        <p>把「来源」当成一等字段。元数据是读的、猜的、还是模板拼的，必须记在记录里，而不是记在开发者的脑子里。exact 与 inferred 之间那道线，是这套系统所有诚实的地基。</p>
+      </div>
+      <div class="rule">
+        <b>准则二</b>
+        <p>并发是预算，不是免费的勇气。一个按用户限流的渠道面前，多发请求等于降低成功率。默认并发 2、视频 1、批量自己一套节拍——这些数字不是为了保守好看，是拿 429 换来的。</p>
+      </div>
+      <div class="rule">
+        <b>准则三</b>
+        <p>给每个失败起一个名字，然后用名字决定动作。换渠道、换接口、还是立刻停手，全看错误码而不看心情。名字起得越准，降级表就越短，人也就越少在深夜猜「到底哪坏了」。</p>
+      </div>
+    </div>
+
+    <p class="limits"><b>留下的问题。</b>这一篇没有解决「怎么判断一张图好不好」——它甚至没打算碰。它只处理了另一件事：怎么保证一张图、连同它周边的一切说法，都能被复查。前者是审美，后者是工程；审美没有账本，工程必须有。</p>
+    <p class="limits" style="border-top:0;padding-top:12px">五张插图来自一个聚合渠道，用的是这篇要讲的那套接口。它们被生成的那天，那个渠道正按每用户 1 并发限流——所以这篇文章的第一个数据点，就是它自己的绊倒。</p>
+
+    <div class="links">
+      <a href="https://github.com/StarrySea1412/imagestudio-story">本篇源码（本页）</a>
+      <a href="https://gitee.com/starry-sea-1412/ai-image-studio">画境 · ai-image-studio</a>
+      <a href="https://starrysea1412.github.io/seeflow-story/">上一期：让 Agent 亲眼看一眼</a>
+    </div>
+  </div>
+</section>
+
+</main>
+<footer class="wrap site-foot">
+  <div>
+    <div>造物手记 VOL.06 · 等一张图显影</div>
+    <div style="margin-top:5px">AI IMAGE STUDIO / 2026.10 / 单文件 · 零依赖</div>
+  </div>
+  <div class="foot-note">文中数字来自本机 ai-image-studio 实例的 db.json、源码行数与测试文件（2026-10-22 快照）：48 条渠道、4 条生成记录（3 失败 1 成功）、30 条 API 路由、56 个用例（55 过 1 挂）、11,329 行前后端 JS。四枚小样都是确定性模型，参数与判定规则写在各章正文。插图由 GPT 系图像模型生成，字体为 LXGW 文楷（OFL）。</div>
+</footer>
+
+<script>
+/* 四枚确定性小样 + 阅读进度条。零依赖，全部原生 DOM。 */
+(() => {
+  "use strict";
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const fmt = (t) => {
+    t = Math.max(0, Math.round(t));
+    return t >= 60 ? Math.floor(t / 60) + "m" + String(t % 60).padStart(2, "0") + "s" : t + "s";
+  };
+
+  /* ── 阅读进度 ───────────────────────────── */
+  const prog = $("#progress");
+  if (prog) {
+    const paint = () => {
+      const h = document.documentElement;
+      const max = h.scrollHeight - h.clientHeight;
+      prog.style.transform = "scaleX(" + (max > 0 ? h.scrollTop / max : 0) + ")";
+    };
+    addEventListener("scroll", paint, { passive: true });
+    addEventListener("resize", paint, { passive: true });
+    paint();
+  }
+
+  /* ══════════════════════════════════════════
+     DEMO 01 · 渠道体检台
+     能力判定直接照抄 src/provider-service.js 的四张关键词表
+     ══════════════════════════════════════════ */
+  (() => {
+    const root = $("#demo-clinic");
+    if (!root) return;
+
+    const IMAGE_HINTS = ["image", "dall", "flux", "stable-diffusion", "sdxl", "sd3", "imagen", "ideogram", "kolors", "qwen-image", "seedream"];
+    const TEXT_HINTS = ["gpt", "claude", "gemini", "qwen", "deepseek", "llama", "mistral", "chat"];
+    const VISION_HINTS = ["vision", "vl", "gpt-4o", "gpt-4.1", "gemini", "qwen-vl", "qwen2.5-vl", "llava"];
+    const VIDEO_HINTS = ["sora", "video", "cogvideo", "kling", "seedance", "hailuo", "vidu", "veo", "hunyuan", "wanx", "wan2", "pika", "luma", "runway", "ltx", "mochi"];
+
+    function capsOf(id) {
+      const v = String(id).toLowerCase();
+      const out = [];
+      const videoCapable = VIDEO_HINTS.some((h) => v.includes(h));
+      if (videoCapable) out.push("video");
+      const imageCapable = IMAGE_HINTS.some((h) => v.includes(h));
+      if (imageCapable) out.push("image");
+      if (!imageCapable && !videoCapable && (TEXT_HINTS.some((h) => v.includes(h)) || !out.length)) out.push("text");
+      if (VISION_HINTS.some((h) => v.includes(h))) out.push("vision");
+      return [...new Set(out)];
+    }
+
+    const CHANNELS = [
+      { id: "lupi", name: "噜皮生图", host: "image.mlgb7.com", models: ["gpt-image-2", "gpt-image-1.5", "gpt-4o"] },
+      { id: "imghub", name: "IMG Hub", host: "aiddup.com", models: ["auto", "seedream-4.0", "nano-banana"] },
+      { id: "relayx", name: "中转 X", host: "relay.example.net", models: ["sora-2", "gpt-4o"] },
+      { id: "local", name: "本地 ComfyUI", host: "127.0.0.1:8188", models: ["sd3.5-large", "flux-schnell"] },
+      { id: "cloud", name: "某云", host: "api.example.cn", models: ["qwen-image", "qwen-vl-max"] },
+      { id: "pool", name: "免费池", host: "free.example.org", models: ["auto"] }
+    ];
+
+    const state = { main: "lupi", dead: false, overrideAuto: false, locked: false };
+    const elList = $("#cl-list");
+    const elMain = $("#cl-main");
+    const elMainModels = $("#cl-main-models");
+    const elCand = $("#cl-cand");
+    const elEvents = $("#cl-events");
+    const elPaid = $("#cl-paid");
+    const elLock = $("#cl-lock");
+    const elKill = $("#cl-kill");
+
+    const capsFor = (ch) =>
+      ch.models.map((m) => {
+        let caps = capsOf(m);
+        // 「手动标成生图」：真实系统里靠模型下拉直接选它来绕过能力推断的自动筛选
+        if (state.overrideAuto && m === "auto") caps = [...new Set(["image", "text"])];
+        return { model: m, caps };
+      });
+
+    const imageModels = (ch) => capsFor(ch).filter((x) => x.caps.includes("image")).map((x) => x.model);
+
+    function candidates() {
+      return CHANNELS
+        .filter((c) => c.id !== state.main)
+        .map((c) => ({ ch: c, imgs: imageModels(c) }))
+        .filter((x) => x.imgs.length > 0)
+        .sort((a, b) => b.imgs.length - a.imgs.length); // 稳定排序：数量相同保持原顺序
+    }
+
+    function render() {
+      const main = CHANNELS.find((c) => c.id === state.main);
+      const cands = candidates();
+      elMain.textContent = main.name;
+      elMainModels.textContent = imageModels(main).length;
+      elCand.textContent = cands.length;
+
+      elList.innerHTML = CHANNELS.map((ch) => {
+        const isMain = ch.id === state.main;
+        const isDead = isMain && state.dead;
+        const caps = capsFor(ch);
+        const tags = caps
+          .flatMap((x) => x.caps.map((c) => ({ c, m: x.model })))
+          .filter((x, i, arr) => arr.findIndex((y) => y.c === x.c) === i)
+          .map((x) => `<span class="cap ${x.c === "image" ? "img" : x.c === "video" ? "vid" : x.c === "vision" ? "vis" : "txt"}">${
+            x.c === "image" ? "生图" : x.c === "video" ? "视频" : x.c === "vision" ? "视觉" : "文本"
+          }</span>`)
+          .join("");
+        return `<button type="button" class="ch-row" data-id="${ch.id}" data-main="${isMain}" data-dead="${isDead}">
+          <span class="nm">${esc(ch.name)}${isMain ? '<i class="role">主力</i>' : ""}${isDead ? '<i class="role" style="color:#e88b7b;border-color:rgba(207,91,69,.5)">已挂</i>' : ""}</span>
+          <span class="caps">${tags}</span>
+          <span class="md">${esc(ch.host)} · ${esc(ch.models.join(" / "))}</span>
+        </button>`;
+      }).join("");
+
+      const events = [];
+      if (!state.dead) {
+        events.push(`<div class="evtrow ok"><b>patrol.ok</b> 主力「${esc(main.name)}」/models 返回 200，生图模型 ${imageModels(main).length} 个，不动作</div>`);
+      } else if (state.locked) {
+        events.push(`<div class="evtrow bad"><b>patrol.locked</b> 主力生图「${esc(main.name)}」检测失败，但已锁定不自动切换</div>`);
+      } else if (cands.length) {
+        const next = cands[0];
+        events.push(`<div class="evtrow ok"><b>patrol.switch</b> 主力生图已从「${esc(main.name)}」自动切到「${esc(next.ch.name)}」，模型 <code>${esc(next.imgs[0])}</code></div>`);
+        events.push(`<div class="evtrow"><b>roles.image</b> ${esc((next.ch.id === "imghub") ? "注意：并列时按数组顺序取第一个——IMG Hub 与本地 ComfyUI 都是 2 个生图模型，先出现的赢。" : "切换的代价是图风会变：新渠道的默认模型未必和原来一致。")}</div>`);
+      } else {
+        events.push(`<div class="evtrow bad"><b>patrol.empty</b> 找不到任何含生图模型的接替渠道，主力保持「${esc(main.name)}」，任务会继续失败</div>`);
+      }
+      if (state.overrideAuto) {
+        events.push(`<div class="evtrow"><b>manual</b> auto 被人工标成生图：它其实一直能出图，只是名字里没有关键词，自动候选池永远看不见它。</div>`);
+      }
+      elEvents.innerHTML = events.join("");
+    }
+
+    elList.addEventListener("click", (e) => {
+      const row = e.target.closest(".ch-row");
+      if (!row) return;
+      state.main = row.dataset.id;
+      state.dead = false;
+      render();
+    });
+    elPaid.addEventListener("input", () => { state.overrideAuto = elPaid.checked; render(); });
+    elLock.addEventListener("input", () => { state.locked = elLock.checked; render(); });
+    elKill.addEventListener("click", () => {
+      state.dead = !state.dead;
+      elKill.textContent = state.dead ? "恢复主力" : "模拟主力挂掉";
+      render();
+    });
+    render();
+  })();
+
+  /* ══════════════════════════════════════════
+     DEMO 02 · 队列预算台
+     贪心列表调度：每个任务放进最早空出的槽位
+     ══════════════════════════════════════════ */
+  (() => {
+    const root = $("#demo-queue");
+    if (!root) return;
+    const state = { cancelled: new Set() };
+    const elCount = $("#q-count"), elConc = $("#q-conc"), elBase = $("#q-base"), elLimit = $("#q-limit1");
+    const elGantt = $("#q-gantt"), elTotal = $("#q-total"), elPeak = $("#q-peak"), elWait = $("#q-wait"), elCancel = $("#q-cancel"), elNote = $("#q-note");
+
+    // 固定种子抖动：同一组参数每次结果一致（这是小样，不是压测）
+    function rnd(seed) {
+      let s = seed | 0;
+      s = Math.imul(s ^ (s >>> 15), 1 | s);
+      s ^= s + Math.imul(s ^ (s >>> 7), 61 | s);
+      return ((s ^ (s >>> 14)) >>> 0) / 4294967296;
+    }
+
+    function schedule() {
+      const n = +elCount.value;
+      const conc = elLimit.checked ? 1 : +elConc.value;
+      const base = +elBase.value;
+      const tasks = [];
+      for (let i = 0; i < n; i++) {
+        const dur = Math.round(base * (0.6 + 0.8 * rnd(1013 + i * 7919)));
+        tasks.push({ id: i, dur, start: 0, end: 0, waited: false });
+      }
+      const slots = new Array(conc).fill(0);
+      for (const t of tasks) {
+        let idx = 0;
+        for (let i = 1; i < slots.length; i++) if (slots[i] < slots[idx]) idx = i;
+        t.start = slots[idx];
+        t.end = t.start + t.dur;
+        t.waited = t.start > 0;
+        slots[idx] = t.end;
+      }
+      const total = Math.max(...tasks.map((t) => t.end));
+      // 峰值在途：扫描所有起止事件
+      const events = [];
+      tasks.forEach((t) => { events.push([t.start, 1]); events.push([t.end, -1]); });
+      events.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      let cur = 0, peak = 0;
+      events.forEach((e) => { cur += e[1]; peak = Math.max(peak, cur); });
+      return { n, conc, base, tasks, total, peak, lastWait: tasks[tasks.length - 1].start };
+    }
+
+    function render() {
+      $("#q-count-v").textContent = elCount.value;
+      $("#q-conc-v").textContent = elConc.value;
+      $("#q-base-v").textContent = elBase.value + "s";
+      const s = schedule();
+      elGantt.innerHTML = s.tasks.map((t) => {
+        const left = (t.start / s.total) * 100;
+        const width = Math.max(1.2, (t.dur / s.total) * 100);
+        const cancelled = state.cancelled.has(t.id);
+        const st = cancelled ? "cancelled" : t.waited ? "queued" : "immediate";
+        const tip = `#${t.id + 1} · ${fmt(t.start)} 开始 · 耗时 ${t.dur}s${cancelled ? " · 已取消（结果丢弃）" : ""}`;
+        return `<div class="qtrack"><div class="qbar" data-state="${st}" data-id="${t.id}" style="left:${left.toFixed(2)}%;width:${width.toFixed(2)}%" title="${esc(tip)}"></div></div>`;
+      }).join("") + `<div class="qaxis"><span>0s</span><span>${fmt(s.total / 2)}</span><span>${fmt(s.total)}</span></div>`;
+
+      elTotal.textContent = Math.round(s.total);
+      elPeak.textContent = s.peak;
+      elWait.textContent = Math.round(s.lastWait) + "s";
+      elCancel.textContent = state.cancelled.size;
+
+      const notes = [];
+      if (elLimit.checked && +elConc.value > 1) {
+        notes.push(`渠道限 1 并发：并发拖到 ${elConc.value} 也没用，多出来的 ${+elConc.value - 1} 个槽位永远是空的——真实世界里的它们会被 429 打发回来。`);
+      }
+      if (+elConc.value > s.n) {
+        notes.push("并发比任务还多：所有任务一开工就全速跑完，没有排队。");
+      }
+      if (state.cancelled.size) {
+        notes.push(`取消 ${state.cancelled.size} 个任务，总时长一格没变——槽位仍被上游占着，只是结果被丢弃。取消省的是你的注意力，不是机器时间。`);
+      }
+      elNote.textContent = notes.length ? notes.join(" ") : "横轴是时间；每行一个任务。琥珀 = 立刻开始，青 = 排过队，斜纹 = 已取消但结果丢弃。";
+    }
+
+    elGantt.addEventListener("click", (e) => {
+      const bar = e.target.closest(".qbar");
+      if (!bar) return;
+      const id = +bar.dataset.id;
+      if (state.cancelled.has(id)) state.cancelled.delete(id);
+      else state.cancelled.add(id);
+      render();
+    });
+    [elCount, elConc, elBase, elLimit].forEach((el) => el.addEventListener("input", () => {
+      state.cancelled.clear();
+      render();
+    }));
+    render();
+  })();
+
+  /* ══════════════════════════════════════════
+     DEMO 03 · 降级链
+     照抄 generateImageOnce / generateImage 的两张判定表
+     ══════════════════════════════════════════ */
+  (() => {
+    const root = $("#demo-fallback");
+    if (!root) return;
+    const NO_FAILOVER = ["PROVIDER_REQUIRED", "MODEL_REQUIRED", "PROVIDER_NOT_CONFIGURED", "IMAGE_TOO_LARGE",
+      "IMAGE_RESPONSE_UNSUPPORTED", "IMAGE_MIME_INVALID", "IMAGE_URL_INVALID", "PROVIDER_AUTH_FAILED"];
+    const state = { status: "429", mask: false, backup: true, chatFails: true };
+    const elStatus = $("#fb-status"), elMask = $("#fb-mask"), elBackup = $("#fb-backup"), elChatFails = $("#fb-chatfails");
+    const elChain = $("#fb-chain"), elVerdict = $("#fb-verdict");
+
+    function chip(ix, title, note, v) {
+      const label = { run: "执行", pass: "通过", stop: "终止", skip: "跳过", wait: "等待" }[v] || "";
+      return `<div class="chip" data-v="${v}"><span class="ix">${ix}</span><span class="tt"><b>${title}</b><small>${note}</small></span><span class="vd">${label}</span></div>`;
+    }
+
+    function render() {
+      const st = state.status;
+      const isAuth = ["401", "402", "403"].includes(st);
+      const is200 = st === "200";
+      const steps = [];
+      let code = "";
+      let success = false;
+      let route = "";
+      let i = 1;
+
+      steps.push(chip(i++, `主力 /v1/images/generations`, is200 ? "HTTP 200，但 data[0] 不存在" : `HTTP ${st}${st === "429" ? "（并发限流）" : ""}`, "run"));
+
+      if (isAuth) {
+        steps.push(chip(i++, "跳过 chat 型降级", "401/402/403 换接口格式也没用，直接抛", "skip"));
+        code = "IMAGE_GENERATION_FAILED";
+      } else if (is200) {
+        if (state.mask) {
+          steps.push(chip(i++, "跳过 chat 型降级", "带蒙版：chat 接口没地方放 mask", "skip"));
+          code = "IMAGE_RESPONSE_UNSUPPORTED";
+        } else if (state.chatFails) {
+          steps.push(chip(i++, "尝试 chat 型生图", "images[] / Markdown / data URI / 裸 URL 四种解析，都没有图", "stop"));
+          code = "IMAGE_RESPONSE_UNSUPPORTED";
+        } else {
+          steps.push(chip(i++, "尝试 chat 型生图", "从 message.images[].image_url.url 拿到图，仍走同一套 mime 与大小检查", "pass"));
+          success = true;
+          route = "remote-chat";
+        }
+      } else {
+        if (state.mask) {
+          steps.push(chip(i++, "跳过 chat 型降级", "带蒙版：局部重绘只能走 /images/edits", "skip"));
+        } else if (state.chatFails) {
+          steps.push(chip(i++, "尝试 chat 型生图", "这条渠道的 chat 也没有图，以原始错误为准", "stop"));
+        } else {
+          steps.push(chip(i++, "尝试 chat 型生图", `HTTP ${st} 之后仍从 chat 拿到了图；尺寸只能靠提示词附带，seed 丢失`, "pass"));
+          success = true;
+          route = "remote-chat";
+        }
+        code = "IMAGE_GENERATION_FAILED";
+      }
+
+      if (!success) {
+        if (NO_FAILOVER.includes(code)) {
+          steps.push(chip(i++, "外层：不换渠道", `<code>${code}</code> 在白名单里——判定为配置/内容问题，换渠道也不会更好`, "stop"));
+        } else if (!state.backup) {
+          steps.push(chip(i++, "外层：无渠道可换", "没有其它含生图模型的启用渠道，只能把原错误抛给用户", "stop"));
+        } else {
+          steps.push(chip(i++, "外层：换一条渠道", "按生图模型数量降序取第一个备用渠道，带上同样的参数重试<strong>一次</strong>", "pass"));
+          success = true;
+          route = "remote-fallback";
+        }
+      }
+
+      elChain.innerHTML = steps.join("");
+
+      if (success) {
+        elVerdict.innerHTML = `结局：<b>出图了</b>。记录里的 <code>source</code> 会被标成 <code>${route}</code>${
+          route === "remote-fallback" ? "，并附一个 <code>fallbackFrom</code> 指回失败的那条渠道" : ""
+        }。<div class="code-line">成功不等于没出错：错误码、失败渠道、降级路径都该进日志。</div>`;
+      } else {
+        elVerdict.innerHTML = `结局：<b>失败</b>，抛给用户 <code>${code}</code>。<div class="code-line">${
+          code === "IMAGE_RESPONSE_UNSUPPORTED"
+            ? "这是整张表里唯一的死路：200 + 无图 被判成「模型不支持」，白名单拦住了换渠道，哪怕你有五条健康渠道。"
+            : "这条错误码不在白名单里时，只要还有备用渠道，任务就还有一次机会。"
+        }</div>`;
+      }
+    }
+
+    elStatus.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-s]");
+      if (!btn) return;
+      state.status = btn.dataset.s;
+      $$("button[data-s]", elStatus).forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+      render();
+    });
+    elMask.addEventListener("input", () => { state.mask = elMask.checked; render(); });
+    elBackup.addEventListener("input", () => { state.backup = elBackup.checked; render(); });
+    if (elChatFails) elChatFails.addEventListener("input", () => { state.chatFails = elChatFails.checked; render(); });
+    render();
+  })();
+
+  /* ══════════════════════════════════════════
+     DEMO 04 · 元数据账本
+     ══════════════════════════════════════════ */
+  (() => {
+    const root = $("#demo-ledger");
+    if (!root) return;
+    const state = { mode: "read", src: "a1111", shape: "clean", vision: false };
+
+    const SRC = {
+      a1111: {
+        label: "AUTOMATIC1111 PNG Info",
+        raw: "a serene lakeside at dawn, 35mm film still, soft haze over the water,\nwarm rim light on the reeds, muted teal and amber palette\nNegative prompt: lowres, blurry, watermark, extra fingers\nSteps: 28, Sampler: DPM++ 2M, CFG scale: 7, Seed: 8123477, Size: 1024x1024",
+        rawNote: "tEXt 块 · parameters 字段；三段结构：正向 → Negative prompt: → 参数行",
+        prompt: "a serene lakeside at dawn, 35mm film still, soft haze over the water, warm rim light on the reeds, muted teal and amber palette",
+        negative: "lowres, blurry, watermark, extra fingers",
+        params: "Steps 28 · DPM++ 2M · CFG 7 · Seed 8123477 · 1024x1024",
+        exact: true, inferred: false, usable: true
+      },
+      comfy: {
+        label: "ComfyUI workflow",
+        raw: '{"3":{"class_type":"KSampler","inputs":{"positive":["6",0],"negative":["7",0],"seed":448812,"steps":24}},\n"6":{"class_type":"CLIPTextEncode","inputs":{"text":"harbor at dusk, wet cobblestone, gas lamp glow, 50mm"}},\n"7":{"class_type":"CLIPTextEncode","inputs":{"text":"text, watermark, deformed"}}}',
+        rawNote: "prompt 字段是一整张节点图；要顺着 KSampler 的 positive/negative 输入往上游追",
+        prompt: "harbor at dusk, wet cobblestone, gas lamp glow, 50mm",
+        negative: "text, watermark, deformed",
+        params: "KSampler · steps 24 · seed 448812",
+        exact: true, inferred: false, usable: true
+      },
+      invoke: {
+        label: "InvokeAI metadata",
+        raw: '{"sd-metadata":{"model":"sd-1.5","image":{"prompt":[{"prompt":"foggy pine ridge at first light, long lens, cold air"}],"width":768,"height":1024,"seed":99123,"cfg_scale":7.5}}}',
+        rawNote: "sd-metadata / invokeai_metadata；字段名与 A1111 完全不同，正负向藏在 image.prompt[] 里",
+        prompt: "foggy pine ridge at first light, long lens, cold air",
+        negative: "",
+        params: "sd-1.5 · 768×1024 · seed 99123 · CFG 7.5",
+        exact: true, inferred: false, usable: true
+      },
+      desc: {
+        label: "图片文本元数据",
+        raw: "Description: 海边黄昏，暖色逆光，胶片颗粒，远处有一艘小船",
+        rawNote: "没有 Parameters，只有一段人写的说明——它可能是作者写的，也可能不是",
+        prompt: "海边黄昏，暖色逆光，胶片颗粒，远处有一艘小船",
+        negative: "",
+        params: "—",
+        exact: true, inferred: false, usable: true
+      },
+      none: {
+        label: "（无）",
+        raw: "（这个 PNG 里没有任何文本块：截图、二次压缩、格式转换都会把它们抹掉）",
+        rawNote: "读取结果为 null，进入反推分支",
+        prompt: "",
+        negative: "",
+        params: "—",
+        exact: false, inferred: false, usable: false
+      }
+    };
+
+    const SHAPES = {
+      clean: {
+        raw: '{"polishedPrompt":"a lone lighthouse on a basalt cliff at blue hour, long exposure sea mist, cold teal shadows with a single warm window light, 24mm wide angle, fine film grain","negativePrompt":"text, watermark, oversharpened","keywords":["lighthouse","blue hour","long exposure"]}',
+        note: "一次 JSON.parse 成功",
+        source: "remote-text",
+        prompt: "a lone lighthouse on a basalt cliff at blue hour, long exposure sea mist, cold teal shadows with a single warm window light, 24mm wide angle, fine film grain"
+      },
+      fence: {
+        raw: "```json\n{\"polishedPrompt\":\"a lone lighthouse on a basalt cliff at blue hour, long exposure sea mist, cold teal shadows with a single warm window light, 24mm wide angle, fine film grain\",\"negativePrompt\":\"text, watermark, oversharpened\",\"keywords\":[\"lighthouse\",\"blue hour\",\"long exposure\"]}\n```",
+        note: "剥掉 Markdown 围栏后，第二次 parse 成功",
+        source: "remote-text",
+        prompt: "a lone lighthouse on a basalt cliff at blue hour, long exposure sea mist, cold teal shadows with a single warm window light, 24mm wide angle, fine film grain"
+      },
+      chatty: {
+        raw: "好的，以下是润色结果：\n{\"polishedPrompt\":\"a lone lighthouse on a basalt cliff at blue hour, long exposure sea mist, cold teal shadows with a single warm window light, 24mm wide angle, fine film grain\",\"negativePrompt\":\"text, watermark, oversharpened\",\"keywords\":[\"lighthouse\",\"blue hour\",\"long exposure\"]}\n希望这个版本符合你的预期。",
+        note: "从第一个 { 截到最后一个 }，第三次 parse 成功",
+        source: "remote-text",
+        prompt: "a lone lighthouse on a basalt cliff at blue hour, long exposure sea mist, cold teal shadows with a single warm window light, 24mm wide angle, fine film grain"
+      },
+      prose: {
+        raw: "这幅画面应该描绘蓝调时刻的一座灯塔，孤零零地立在玄武岩悬崖上。长曝光让海雾呈现出丝绸般的质感，冷青色的阴影里只有一扇窗透出暖光。建议使用 24mm 广角，并保留胶片颗粒……",
+        note: "三层都没接住（无围栏可剥、没有花括号）→ 退回本地规则",
+        source: "local-rules",
+        prompt: "海边孤立的灯塔，蓝调时刻，长曝光海雾，冷青阴影与一扇暖窗，24mm 广角，胶片颗粒，构图明确，主体突出，光线、材质、色彩和镜头信息完整，细节丰富，画面统一，高质量"
+      }
+    };
+
+    const elMode = $("#lg-mode"), elSrc = $("#lg-src"), elShape = $("#lg-shape");
+    const elSrcWrap = $("#lg-src-wrap"), elShapeWrap = $("#lg-shape-wrap"), elVisionWrap = $("#lg-vision-wrap");
+    const elVision = $("#lg-vision");
+    const elRaw = $("#lg-raw"), elRawNote = $("#lg-raw-note"), elRawLabel = $("#lg-raw-label");
+    const elFlag = $("#lg-flag"), elRows = $("#lg-rows"), elNotice = $("#lg-notice");
+
+    const row = (k, v, hot) => `<div class="ledger-row"><span>${k}</span><b class="${hot ? "hot" : ""}">${esc(v)}</b></div>`;
+
+    function renderRead() {
+      const s = SRC[state.src];
+      elRawLabel.textContent = "文件里的原始文本（节选）";
+      elRaw.textContent = s.raw;
+      elRawNote.textContent = s.rawNote;
+
+      let rec = s;
+      let notice = "";
+      if (state.src === "none") {
+        if (state.vision) {
+          rec = {
+            label: "视觉模型反推",
+            prompt: "a quiet harbor at dusk, moored fishing boats, wet stone quay, warm lamp reflections on black water, soft rain haze, 35mm",
+            negative: "text, logo, watermark",
+            params: "—",
+            exact: false, inferred: true, usable: true
+          };
+          notice = "这张图没有可读取的生成元数据。以下提示词由视觉模型看图反推，不是作者原始提示词。";
+        } else {
+          rec = { label: "（不可用）", prompt: "", negative: "", params: "—", exact: false, inferred: true, usable: false };
+          notice = "图片中没有可读取的生成元数据，且当前服务没有配置可用的视觉模型。请在「服务与模型」中设置 vision 模型后再试。";
+        }
+      }
+
+      elFlag.innerHTML = rec.usable
+        ? (rec.inferred ? '<span class="tag warn">推测 · inferred</span>' : '<span class="tag ok">读自文件 · exact</span>')
+        : '<span class="tag bad">不可用</span>';
+
+      elRows.innerHTML =
+        row("来源", rec.label, true) +
+        row("exact", String(rec.exact)) +
+        row("inferred", String(rec.inferred)) +
+        row("usable", String(rec.usable)) +
+        row("提示词", rec.prompt || "（空）") +
+        row("负向词", rec.negative || "（无）") +
+        row("参数", rec.params);
+      elNotice.style.display = notice ? "block" : "none";
+      elNotice.textContent = notice;
+    }
+
+    function renderPolish() {
+      const s = SHAPES[state.shape];
+      elRawLabel.textContent = "文本模型的原文（节选）";
+      elRaw.textContent = s.raw;
+      elRawNote.textContent = s.note;
+      elFlag.innerHTML = s.source === "local-rules"
+        ? '<span class="tag warn">本地规则 · local-rules</span>'
+        : '<span class="tag ok">模型返回 · remote-text</span>';
+      elRows.innerHTML =
+        row("source", s.source, true) +
+        row("polishedPrompt", s.prompt) +
+        row("negativePrompt", "text, watermark, oversharpened") +
+        row("keywords", "lighthouse / blue hour / long exposure") +
+        row("model", s.source === "local-rules" ? "demo-prompt-polisher" : "gpt-4.1-mini");
+      elNotice.style.display = "block";
+      elNotice.textContent = s.source === "local-rules"
+        ? "模型没给出可用 JSON，系统退回本地模板。这条记录仍然可用，但 source 明确写着它不是模型写的——所以它算不上「润色」，只是「补全」。"
+        : "解析成功。注意 polishedPrompt 是一段可直接提交的完整提示词，不是标题或关键词摘要——这条约束写在 system 提示里，也是润色最常失败的地方。";
+    }
+
+    function render() {
+      const read = state.mode === "read";
+      elSrcWrap.style.display = read ? "" : "none";
+      elVisionWrap.style.display = read ? "" : "none";
+      elShapeWrap.style.display = read ? "none" : "";
+      if (read) renderRead();
+      else renderPolish();
+    }
+
+    elMode.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-m]");
+      if (!btn) return;
+      state.mode = btn.dataset.m;
+      $$("button[data-m]", elMode).forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+      render();
+    });
+    elSrc.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-s]");
+      if (!btn) return;
+      state.src = btn.dataset.s;
+      $$("button[data-s]", elSrc).forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+      render();
+    });
+    elShape.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-s]");
+      if (!btn) return;
+      state.shape = btn.dataset.s;
+      $$("button[data-s]", elShape).forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+      render();
+    });
+    elVision.addEventListener("input", () => { state.vision = elVision.checked; render(); });
+    render();
+  })();
+})();
+
+</script>
+</body>
+</html>

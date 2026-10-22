@@ -1,0 +1,67 @@
+<header class="wrap masthead">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="2" stroke="#e6a33b" stroke-width="1.3"/><circle cx="12" cy="9.5" r="2.4" stroke="#79b3a6" stroke-width="1.2"/><path d="M6 15.5h12M6 17.8h7" stroke="#e6a33b" stroke-width="1" opacity=".7"/><path d="M12 4v2.2" stroke="#e6a33b" stroke-width="1"/></svg></span>
+    <span>造物手记 <small>VOL.06</small></span>
+  </div>
+  <div class="edition">
+    <span class="rec"><i class="rec-dot" aria-hidden="true"></i>SAFELIGHT ON / 暗房作业中</span>
+    <span>VOL.06 · 2026.10</span>
+  </div>
+</header>
+
+<section class="wrap hero">
+  <div>
+    <p class="eyebrow"><span>FIELD NOTES</span>一个 AI 生图工作台的解剖报告</p>
+    <h1>等一张图<br/><em>显影</em><span class="sub">从渠道体检到队列预算——一条不许跳步的流水线</span></h1>
+    <div class="dek-wrap">
+      <p class="dek-tag">本篇提要</p>
+      <p class="dek">生图工具都在比谁的模型多。可真用起来，先坏掉的往往不是模型：是那条把「一次点按」翻译成「一次排队、一次降级、一次落盘、一次记账」的流水线。这篇拆一个自己写的生图工作台：它怎么查渠道、怎么排队、怎么在失败时换一条路，以及它凭什么说某句话是作者写的、某句话是它猜的。</p>
+    </div>
+    <div class="hero-meta">
+      <span class="pill"><b>48</b> 条已配渠道</span>
+      <span class="pill"><b>30</b> 个 API 路由</span>
+      <span class="pill"><b>56</b> 个测试用例</span>
+      <span class="pill"><b>4</b> 档降级</span>
+    </div>
+  </div>
+  <figure class="art">
+    <div class="sheet">
+      <div class="sheet-img">
+        <img src="assets/art/hero.webp" alt="暗房里的木桌：一盏琥珀色安全灯，一台老式胶片放大机把光柱投在显影盘上方，桌上散落着几张刚显影完成的黑白照片，背景里一台屏幕显示着四格图片网格" width="1536" height="1024"/>
+        <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+      </div>
+      <div class="exif-bar"><span>SAFELIGHT / 12&nbsp;ft-candle</span><span class="hot">F8 · 1/125 · ISO 400</span></div>
+    </div>
+    <figcaption><span><b>FIG. 00</b> 显影不是一瞬间，是一段可以被掐断的过程</span><span>OIL / DIGITAL / 2026</span></figcaption>
+  </figure>
+</section>
+
+<section class="stats" aria-label="关键数字">
+  <div class="wrap stats-inner">
+    <div class="stat"><b>48<span>条</span></b><small>本机配置的模型渠道</small></div>
+    <div class="stat"><b>4<span>张</span></b><small>本机真正生成的作品</small></div>
+    <div class="stat"><b>30<span>个</span></b><small>API 路由（不含静态页）</small></div>
+    <div class="stat"><b>55<span>/56</span></b><small>测试通过（1 条挂着）</small></div>
+  </div>
+</section>
+
+<div class="wrap opening">
+  <div class="prose">
+    <p class="lead">2026 年 10 月，我为了给这篇文章配五张插图，同时把三个生成请求发给了一个聚合渠道。两个当场被退回：<code>429 · User concurrency limit reached</code>。四个小时以后，改成一条一条地发，五张图全部出完，单张 75 到 306 秒不等。这条经验听起来像废话，但它正是这个工作台第一版就要解决的问题——<strong>生图不是一次请求，是一条会堵、会断、会被人半路掐掉的流水线。</strong></p>
+    <p>这篇文章解剖的是「画境」，一个自己写的生图工作台。它把渠道管理、提示词润色、参考图与局部重绘、批量矩阵、图库、视频工坊放在同一间屋子里。源码里最长的两个文件是 1,868 行的服务端和 1,128 行的设置页——不优雅，但每一行都对应一次真实的失败。</p>
+    <p>我刻意保留了它的狼狈：本机配了 <strong>48 条渠道</strong>，真正生成过的作品只有 <strong>4 张</strong>；渠道列表长到必须折叠成一行；能力识别靠模型名里的关键词猜；元数据读取要区分「作者写的」和「AI 猜的」。这些不是缺陷清单，这是一个私人工具在真实网络里活下来的形状。</p>
+    <p class="scope">阅读说明：全文约一万二千字，七章。<b>第 1 章</b>给整条流水线的全貌；<b>第 2、3 章</b>是最脏的两块——渠道体检和队列预算；<b>第 4、5 章</b>讲一次生成怎么落盘、失败怎么换路；<b>第 6 章</b>是元数据账本，关于「谁写了这句话」；<b>第 7 章</b>讲怎么证明它没偷偷撒谎。四枚小样全部是确定性模型，参数与判定规则写在正文里，可以自己拖。</p>
+  </div>
+
+  <p class="toc-head"><span>PLATE LIST / 工序表</span><span>07 CHAPTERS · 04 DEMOS</span></p>
+  <nav class="toc" aria-label="目录">
+    <a href="#ch1"><i>01 / PREP</i><span>一行提示词背后<small>一次点按在服务端展开成十六个动作</small></span></a>
+    <a href="#ch2"><i>02 / SOURCE</i><span>渠道是会撒谎的接口<small>76 行列表、按名字猜能力、与一次体检</small></span></a>
+    <a href="#ch3"><i>03 / QUEUE</i><span>并发是一笔预算<small>队列、取消的三种时态、与那句 429</small></span></a>
+    <a href="#ch4"><i>04 / DEVELOP</i><span>一张图的完整旅程<small>base64、URL、mime 白名单与原子写</small></span></a>
+    <a href="#ch5"><i>05 / FALLBACK</i><span>打不过就换一条路<small>四档降级、错误码白名单、十分钟巡检</small></span></a>
+    <a href="#ch6"><i>06 / LEDGER</i><span>谁写了这句话<small>A1111 / ComfyUI / InvokeAI 与「AI 推测」标签</small></span></a>
+    <a href="#ch7"><i>07 / PROOF</i><span>怎么证明它没撒谎<small>56 个测试、错误码分类、以及它管不了的事</small></span></a>
+    <a href="#closing"><i>END / FIX</i><span>结语：把剪刀停在半空<small>三条可以搬走的做法，与四个没解决的死角</small></span></a>
+  </nav>
+</div>

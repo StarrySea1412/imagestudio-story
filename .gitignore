@@ -1,0 +1,10 @@
+node_modules/
+*.log
+shots/
+build/chars.txt
+build/subsetsrc.txt
+build/art-src/
+build/fonts-src/
+.tmp-tests/
+.DS_Store
+Thumbs.db

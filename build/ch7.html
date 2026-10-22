@@ -1,0 +1,82 @@
+<section class="chapter" id="ch7">
+  <div class="ch-head">
+    <div class="ch-num">SCENE<b>07</b></div>
+    <div class="ch-title">
+      <h2>怎么证明它没撒谎</h2>
+      <p>56 个测试、30 条 API 路由、一份会拒绝启动的数据校验。以及一张写清楚了「证明不了什么」的清单。</p>
+    </div>
+  </div>
+  <div class="ch-body">
+    <p class="lede">生图工具的评价标准通常是「出图好不好看」。这个标准没法测，也不该由工具自己测。能测的是另一批东西：取消有没有真的取消、写盘会不会留半张图、错误码分得对不对、key 会不会漏到前端、元数据的来源标得准不准。</p>
+
+    <h3>56 个测试，55 个是绿的</h3>
+    <p>测试用 Node 自带的 <code>node --test</code>，16 个文件 56 个用例，零测试框架依赖。跑一遍 <code>npm test</code>，结果是 <strong>55 过、1 挂</strong>。先看分布，再说那一条红的。</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>文件</th><th>它在防什么</th></tr></thead>
+        <tbody>
+          <tr><td><code>http-transport.test.js</code></td><td>代理选择、重定向跟随与跨源剥离敏感头、超时</td></tr>
+          <tr><td><code>image-metadata.test.js</code></td><td>三套方言的解析、压缩块膨胀上限</td></tr>
+          <tr><td><code>store.test.js</code></td><td>损坏的 db.json 必须拒绝启动、原子写不产生半份文件</td></tr>
+          <tr><td><code>task-cancel.test.js</code></td><td>取消的三种时态、已结束任务不可取消（409）</td></tr>
+          <tr><td><code>batch.test.js</code></td><td>批内并发计数、批完成后放行下一条</td></tr>
+          <tr><td><code>video-flow.test.js</code></td><td>远端任务 ID 的多种字段、状态归一化、续接轮询</td></tr>
+          <tr><td><code>site-relay.test.js</code></td><td>SSE 帧解析、从事件里捞出图片地址</td></tr>
+          <tr><td><code>zip-service.test.js</code></td><td>自写 ZIP 的 CRC32 与目录结构</td></tr>
+          <tr><td><code>provider-service.test.js</code></td><td>端点候选推导、能力推断、错误分类</td></tr>
+          <tr><td><code>vision-image.test.js</code> / <code>clipboard-image.test.js</code></td><td>图片压缩与剪贴板粘贴的边界</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>看名字就知道，没有一个在测「图好不好看」。它们在测的都是会静默出错的地方：一个漏掉的 <code>await</code>、一次没剥干净的重定向头、一个膨胀到 2GB 的解压块、一次「已经取消了但结果还是入库了」。</p>
+    <p>跑法就一条：<code>npm run verify</code>，先 eslint 再 <code>node --test</code>。两个都过，才算能交付。</p>
+
+    <h3>那一条红的</h3>
+    <p>2026 年 10 月 22 日在这台机器上跑了一遍，输出是这个样子的：</p>
+    <div class="code">
+      <div class="code-bar"><b>npm test</b><span>2026-10-22</span></div>
+<pre><span class="c"># tests 56</span>
+<span class="c"># pass 55</span>
+<span class="c"># fail 1</span>
+
+<span class="k">not ok</span> 34 - demo API covers providers, polish, reference upload and generation
+  <span class="s">error:</span> Expected values to be strictly equal:
+  <span class="n">3</span> !== <span class="n">1</span></pre>
+    </div>
+    <p>挂在 <code>server.test.js</code>——那条唯一会真的 <code>spawn</code> 一个服务进程、再用假上游走完「建渠道 → 取模型 → 润色 → 传参考图 → 生成 → 等完成 → 局部重绘 → 导出」全链路的端到端测试。一条计数断言期望 1，实际回来 3。</p>
+    <p>这篇里我没有修它。不是忘了，是它正好落在这一章的论点上：<strong>这套账本之所以可信，不在于它全绿，而在于它把没通过的那一项写在同一个输出里，而不是藏起来。</strong>一个把 56 报成「全部通过」、或者悄悄跳过这一条的项目，看起来更干净，但你就没法知道该信它哪一句话。</p>
+    <p>这也解释了正文里每个数字为什么都带日期。渠道数会变、生成记录会变、测试会由红转绿——写死一句「56 个测试通过」而不说哪一天，等于在补一份自己都复查不了的记录。</p>
+
+    <h3>那些没法写成测试的，就写成文字</h3>
+    <p>有些事测试测不了，只能用一份清单把它固定下来，让每次改动都被迫面对。这个项目的清单是这样的：</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>它能证明</th><th>它证明不了</th></tr></thead>
+        <tbody>
+          <tr><td>文件存在，sha256 一致，像素尺寸与记录相符</td><td>这段提示词真的生成了这张图</td></tr>
+          <tr><td>这次调用走的是哪条渠道、哪个模型</td><td>那条渠道明天还活着</td></tr>
+          <tr><td>排队用了多久、生成用了多久</td><td>模型会照提示词执行——尺寸就是反例</td></tr>
+          <tr><td>元数据来自哪个解析器（A1111 / ComfyUI / InvokeAI）</td><td>那个参数块描述的就是这张图</td></tr>
+          <tr><td>取消发生在排队、运行、还是落盘前</td><td>上游为这次取消退过款</td></tr>
+          <tr><td>key 没有出现在任何接口响应里</td><td>key 没有出现在你的截图里</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>右边这一列不是「以后要修的 bug」，是这个工具的能力边界。写下来是为了防止一件更坏的事：<strong>把「能证明」的那一列，当成「全部」。</strong>一个工具一旦相信自己的账本是完整的，它就会开始替不存在的证据说话。</p>
+
+    <h3>最诚实的一次统计</h3>
+    <p>回到开头那组数字。48 条渠道，4 条生成记录，其中 3 条失败。唯一的成功是一条表情包，提示词要 3840×2160，实际给了 1448×1086。</p>
+    <p>把这四个数字放在一起，得到的是一个不好看但准确的画像：这是一个渠道收集量远超产出量的私人工具，成功率 25%，而且它连自己最朴素的诉求（尺寸）都没能满足。</p>
+    <p>可它同时也做到了另一些事：那 3 次失败各自留下了错误码与阶段；成功的那 1 次留下了哈希、像素、耗时与渠道；今天我用它背后的同一类渠道生成了这篇文章的五张插图，被 429 拒了两次之后，它教会我的第一件事就是别并发。</p>
+    <div class="pull">「能证明」和「好看」是两套完全不同的标准。<b>一个工具选前者，不是因为它更高级，是因为前者可以被复查。</b></div>
+
+    <h3>还没解决的四个死角</h3>
+    <p>这一节按惯例留给没做完的事。它们不是路线图，是四个我知道在哪、但还没动的地方：</p>
+    <ol>
+      <li><strong>单用户假设。</strong>没有登录、没有用户隔离、<code>data/</code> 目录就是全部权限边界。局域网里别人能打开这个端口，就能看到你的全部图与全部渠道。</li>
+      <li><strong>私网访问默认开着。</strong><code>ALLOW_PRIVATE_NETWORK</code> 默认为真，因为这是本机工具、要连本机的 ComfyUI。一旦部署到公网，这个默认值就是一个 SSRF 面，必须改。</li>
+      <li><strong>JSON 库不是数据库。</strong>所有记录在一个 <code>db.json</code> 里，每次写入全量序列化。图到几百张、记录到几千条时会开始变慢，而且没有事务、没有并发控制，只有一条 Promise 链和原子 rename 撑着的「单进程正确」。</li>
+      <li><strong>渠道能力永远靠猜。</strong>模型名关键词表是硬编码的，新模型出来就得手工补。想真正解决，只能让渠道自己声明能力——而这需要上游配合，不是一个客户端能决定的。</li>
+    </ol>
+  </div>
+</section>

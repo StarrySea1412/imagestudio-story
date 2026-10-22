@@ -1,0 +1,112 @@
+<section class="chapter" id="ch3">
+  <div class="ch-head">
+    <div class="ch-num">SCENE<b>03</b></div>
+    <div class="ch-title">
+      <h2>并发是一笔预算</h2>
+      <p>对一个按「每用户并发」限流的渠道，客户端并发不是提速，是自伤。这句话我用一个下午验证了两遍。</p>
+    </div>
+  </div>
+  <div class="ch-body">
+    <p class="lede">第一节里那个 <code>429 · User concurrency limit reached</code>，值得单独讲一段。我当时要五张插图，很自然地并行发了三个——毕竟在自己的机器上，并发是免费的。结果是两个立刻被拒，一个跑了 306 秒才回来。把剩下两张改成一条一条发，全部成功，单张 75 到 83 秒。</p>
+    <p>这不是巧合。很多聚合渠道按「同一账户同时在途的请求数」限流，常见上限就是 1 到 2。你的并发一旦越过它，多出来的请求不是排队，是直接被拒。于是「并发提速」变成了「并发把成功率打到三分之一，再靠重试把时间补回来」。</p>
+    <div class="pull">排队不是慢。排队是把「一定会被拒的并发」换成「一定会被服务的顺序」。<b>在限流的世界里，唯一的加速是少发请求。</b></div>
+
+    <h3>三层闸门</h3>
+    <p>服务端里有三个独立的并发参数，各自服务于不同规模的意图：</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>闸门</th><th>默认</th><th>范围</th><th>它想保护谁</th></tr></thead>
+        <tbody>
+          <tr><td class="num">全局生图</td><td><code>2</code></td><td>1 – 8</td><td>整机同时打给上游的请求总数</td></tr>
+          <tr><td class="num">单批批量</td><td><code>2</code></td><td>2 – 6</td><td>一次批量矩阵内部的同时在途数</td></tr>
+          <tr><td class="num">视频</td><td><code>1</code></td><td>1 – 4</td><td>最贵的那条链：最长等 15 分钟</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>生图默认 2，不是拍脑袋。一方面，2 正好能吃掉「一次生成 4 张、后台慢慢出」的常见节奏；另一方面，2 是小渠道常见限流阈值附近最保守又不至于完全串行的值。视频默认 1，因为一条视频任务可能占着上游十几分钟，并发两条只会让两条都变慢，还会把配额烧光。</p>
+    <p>批量那层最值得说。代码里有一行注释：<strong>「一次批量就是用户明确的并发意图,由本批 concurrency 决定同时在途的任务数」</strong>。意思是，批量不复用全局节奏，它有自己的节拍——用户一次排了 12 个变体，他就是在说「我要它们一起出」。为了避免批量把整机打满，排空函数对批任务做了个小动作：每轮只启动<em>一个</em>批内任务，然后立刻退出本轮循环。</p>
+    <div class="code">
+      <div class="code-bar"><b>src/server.js</b><span>drainGenerationQueue（节选）</span></div>
+<pre><span class="k">while</span> (generationQueue.length) {
+  <span class="k">const</span> next = generationQueue[<span class="n">0</span>];
+  <span class="k">if</span> (next.batch) {
+    <span class="k">const</span> inFlight = batchInFlight.get(next.batch.batchId) || <span class="n">0</span>;
+    <span class="k">if</span> (inFlight &gt;= next.batch.concurrency) <span class="k">break</span>;
+  } <span class="k">else if</span> (runningGenerations &gt;= generationConcurrency) {
+    <span class="k">break</span>;
+  }
+  <span class="k">const</span> { id, batch } = generationQueue.shift();
+  queuedGenerationIds.delete(id);
+  runningGenerations += <span class="n">1</span>;
+  processGeneration(id).finally(() =&gt; { <span class="c">/* 释放槽位 → 放行同批下一条 → 再次排空 */</span> });
+  <span class="k">if</span> (batch) <span class="k">break</span>;   <span class="c">// 批任务一轮只放一个</span>
+}</pre>
+    </div>
+    <p>这行 <code>if (batch) break</code> 看着像偷懒，实际是让批量的节拍由 <code>batchInFlight</code> 计数决定，而不是被全局循环一口气抽干。批内某个任务完成时，<code>finally</code> 里会把同批还排着的下一条重新入队——于是批量的推进变成「完成一个，放一个」，节奏稳定，也不会因为一次点了 12 张就把整台机器塞死。</p>
+
+    <h3>时间去哪了</h3>
+    <p>每条记录都记三个时间：<code>queuedAt</code>、<code>startedAt</code>、<code>completedAt</code>，外加一个 <code>queueDurationMs</code>。这不是为了做漂亮的统计图，是为了回答一个用户一定会问的问题：「为什么我点了之后等了两分钟才出图？」</p>
+    <p>答案分三种，而三者的改法完全不同：</p>
+    <ul>
+      <li><strong>队列时间长</strong>：并发太低，或者前面有一个慢任务卡着。改并发或改渠道。</li>
+      <li><strong>运行时间长</strong>：上游慢。换渠道，或者调低该模型的超时。今天那个 306 秒就是这一类。</li>
+      <li><strong>两者都短但总感觉慢</strong>：前端轮询间隔的问题。列表默认靠 TanStack Query 轮询，间隔和缓存策略决定了「已经好了但你还看着旧状态」的那几秒。</li>
+    </ul>
+    <div class="note"><b>一次真实的账：</b>五张图、单条串行、渠道限并发 1。耗时分别是 306 / 74 / 82 / 83 / 75 秒，合计 620 秒，约 10 分 20 秒。如果那天三条并发都被接受，理论总时长会接近最慢那张的 306 秒——但事实是两条被 429 拒掉，重发之后总时长反而更长。<strong>在限流面前，「理论并发收益」是个负数。</strong></div>
+
+    <h3>取消的账</h3>
+    <p>第 1 章说过取消有三种时态。在队列这里，它还有一个更反直觉的性质：<strong>取消不会提前释放并发槽。</strong></p>
+    <p>因为取消的实现是「打个标记」——<code>cancelledGenerationIds.add(id)</code>，然后把记录改成 <code>cancelled</code>。真正的 HTTP 请求还在飞，<code>processGeneration</code> 的 Promise 还没 resolve，槽位就还占着。等上游把图吐回来，代码检查标记，丢弃结果，<code>finally</code> 才释放槽位。</p>
+    <p>为什么不直接 abort？因为对生图接口 abort 并不能让上游停止计费，反而可能让某些中转报出更难看的错误；而且 abort 之后你连「它到底出没出图」都不知道了。留着请求跑完、只丢结果，是更诚实、也更省事的选择。</p>
+    <p>下面这枚小样把这套调度摊开。拖任务数和并发，看总时长怎么变；点任意一根条可以「取消」，然后注意一件事——<em>总时长一格都不会变。</em></p>
+  </div>
+
+  <div class="demo" id="demo-queue">
+    <div class="demo-head">
+      <span class="demo-tag">DEMO 02</span>
+      <span class="demo-title">队列预算台 <span class="hint">点条子可以取消，看总时长变不变</span></span>
+    </div>
+    <div class="demo-body">
+      <div class="controls">
+        <div class="ctl">
+          <label for="q-count">任务数 <b id="q-count-v">6</b></label>
+          <input id="q-count" type="range" min="1" max="18" step="1" value="6"/>
+        </div>
+        <div class="ctl">
+          <label for="q-conc">全局并发 <b id="q-conc-v">2</b></label>
+          <input id="q-conc" type="range" min="1" max="6" step="1" value="2"/>
+        </div>
+        <div class="ctl">
+          <label for="q-base">单张基准耗时 <b id="q-base-v">60s</b></label>
+          <input id="q-base" type="range" min="20" max="120" step="5" value="60"/>
+        </div>
+        <label class="switch"><input id="q-limit1" type="checkbox"/>渠道限「每用户 1 并发」</label>
+      </div>
+      <div class="q-grid">
+        <div>
+          <div class="gantt" id="q-gantt" aria-label="任务时间线"></div>
+          <div class="big-num" style="margin-top:12px">
+            <div>总时长<b><em id="q-total">0</em>s</b></div>
+            <div>峰值在途<b id="q-peak">0</b></div>
+            <div>末位等待<b id="q-wait">0s</b></div>
+            <div>被取消<b id="q-cancel">0</b></div>
+          </div>
+          <p class="hintline" id="q-note">横轴是时间；每行一个任务。琥珀 = 立刻开始，青 = 排过队，斜纹 = 已取消但结果丢弃。</p>
+        </div>
+        <div class="q-side">
+          <div class="row"><span>排空策略</span><b>队首优先</b></div>
+          <div class="row"><span>槽位释放</span><b>Promise finally</b></div>
+          <div class="row"><span>取消</span><b>打标记，不 abort</b></div>
+          <div class="row"><span>耗时模型</span><b>±40% 抖动</b></div>
+          <div class="legend">
+            <span><i style="background:#d9a441"></i>立刻开始</span>
+            <span><i style="background:#4e7d73"></i>排过队</span>
+            <span><i style="background:#7a3527"></i>已取消</span>
+          </div>
+          <p class="hintline" style="margin-top:12px">耗时抖动用固定种子生成，同一组参数每次结果一致——这是小样，不是压测。</p>
+        </div>
+      </div>
+    </div>
+    <div class="demo-foot"><b>读法</b>：勾上「限 1 并发」后把并发拖到 6，你会看到总时长不动——多出来的并发只会在真实渠道那里变成 429，而这里直接不给你发。取消也一样：标记变了，机器时间没变。</div>
+  </div>
+</section>

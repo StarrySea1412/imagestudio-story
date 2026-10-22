@@ -1,0 +1,87 @@
+<section class="chapter" id="ch4">
+  <div class="ch-head">
+    <div class="ch-num">SCENE<b>04</b></div>
+    <div class="ch-title">
+      <h2>一张图的完整旅程</h2>
+      <p>上游把图给你，只是把负片交到你手上。定影、冲洗、编号、入库——后面的活才决定它能不能被找到。</p>
+    </div>
+  </div>
+  <div class="ch-body">
+    <p class="lede">本机上唯一一张真正生成成功的图，是一张 4 行 6 列的聊天表情包总图。提示词第一句写得很清楚：「生成一张 <strong>3840×2160</strong>、16:9 的单张完整表情包」。请求里 <code>size</code> 传的是 <code>auto</code>——让上游按模型默认值决定。回来的文件是 <strong>1448×1086</strong>。</p>
+    <p>这个差距没有被隐藏。记录里存了真实的宽高和 sha256，所以任何人打开这条记录，都会立刻看到「你要的和你要到的」是两件事。这是这一章想说的事：<strong>落盘不是把字节写进磁盘，是把一次不可复现的调用变成一份可以被复查的证据。</strong></p>
+
+    <h3>上游会以两种方式交图</h3>
+    <p>OpenAI 兼容的生图接口有两种返回形态，这个项目两种都得接：</p>
+    <ul>
+      <li><code>b64_json</code>：图片直接内联在 JSON 里。优点是省一次下载；缺点是响应体可能巨大，而且解码前没有任何机会检查它是什么。</li>
+      <li><code>url</code>：返回一个临时地址，需要客户端自己下载。优点是响应轻；缺点是那个地址可能在几秒后失效，也可能指向一个你完全不该信任的域名。</li>
+    </ul>
+    <p>两条路都设了硬上限，而且上限不是随手写的：base64 <strong>字符串</strong>超过 45MB 拒绝，解码后的 <strong>buffer</strong> 超过 30MB 拒绝。两个数字不同，是因为 base64 有约 4/3 的编码膨胀——一个 30MB 的图，字符串大约 40MB。先卡字符串是为了在解码前就挡住内存炸弹，再卡 buffer 是为了挡住「字符串合法但内容超限」的边界情况。</p>
+    <p>URL 那条路的检查更密。协议只允许 http/https；mime 必须以 <code>image/</code> 开头；<code>content-length</code> 超过 30MB 直接拒；而且下载是流式的——一边读一边累加，超过 30MB 立刻中断，不等读完。</p>
+
+    <h3>为什么偏偏要拒绝 SVG</h3>
+    <p>这一行是整章里最不起眼、也最要紧的一行：</p>
+    <div class="code">
+      <div class="code-bar"><b>src/provider-service.js</b><span>downloadRemoteImage</span></div>
+<pre><span class="k">const</span> mime = (response.headers.get(<span class="s">'content-type'</span>) || <span class="s">'image/png'</span>).split(<span class="s">';'</span>)[<span class="n">0</span>];
+<span class="k">if</span> (!mime.startsWith(<span class="s">'image/'</span>) || mime === <span class="s">'image/svg+xml'</span>) {
+  <span class="k">throw</span> apiError(<span class="s">'IMAGE_MIME_INVALID'</span>, <span class="s">'上游返回的不是安全位图'</span>, <span class="n">502</span>);
+}</pre>
+    </div>
+    <p>SVG 是 XML，XML 可以带 <code>&lt;script&gt;</code>。而这张图接下来会被保存到 <code>data/generated/</code>，再通过同源的 <code>/media/</code> 路径发回浏览器。如果允许 SVG 进来，一个恶意上游就能借你的域名执行脚本——一个「生图工具」变成了存储型 XSS 的跳板。同源是这里的关键：不是「SVG 危险」，是「我们把它放回了自己的域名下」。</p>
+    <div class="note"><b>一个例外：</b>本地演示适配器（<code>adapter:'demo'</code>）生成的占位图就是 SVG，由服务端自己拼字符串产出，不经过这条外部 mime 检查。区别在于它是自己写的，不是别人给的。「同源」在信任自己产出时是优点，在信任上游时是弱点。</div>
+
+    <h3>落盘：先写临时文件，再改名</h3>
+    <p>图片文件名是 <code>crypto.randomUUID()</code> 加扩展名。不用标题、不用时间戳、不用提示词——因为那些都可能包含非法字符、超长、或者重名。UUID 的唯一要求是「不重复」，而它做到了。</p>
+    <p>写入用的是一套两段式：</p>
+    <div class="code">
+      <div class="code-bar"><b>src/server.js</b><span>atomicWrite</span></div>
+<pre><span class="k">async function</span> atomicWrite(file, buffer) {
+  <span class="k">const</span> temp = file + <span class="s">'.'</span> + process.pid + <span class="s">'.tmp'</span>;
+  <span class="k">await</span> fs.promises.writeFile(temp, buffer);
+  <span class="k">await</span> fs.promises.rename(temp, file);
+}</pre>
+    </div>
+    <p>临时文件名带 pid，是为了两个进程（或两次启动）同时写同一个目标时不互相踩。rename 在同一文件系统内是原子操作，所以对读取方来说，<code>f5b15a20….png</code> 要么不存在，要么是完整的——永远不会出现「文件存在但只有一半」的中间态。这对一个会被浏览器直接 <code>&lt;img&gt;</code> 拉取的目录来说，是底线。</p>
+    <p>元数据走的是另一套原子性：整个 <code>db.json</code> 被序列化成快照，写进临时文件，再 rename。所有写入串成一条 Promise 链，链头上挂一个 <code>.catch(() =&gt; {})</code>——这样某一次写失败不会毒化整条链，后面的写入还能继续。</p>
+    <div class="code">
+      <div class="code-bar"><b>src/store.js</b><span>#persist</span></div>
+<pre><span class="k">async</span> #persist() {
+  <span class="k">const</span> snapshot = JSON.stringify(<span class="k">this</span>.db, <span class="k">null</span>, <span class="n">2</span>);
+  <span class="k">this</span>.writeQueue = <span class="k">this</span>.writeQueue.catch(() =&gt; {}).then(<span class="k">async</span> () =&gt; {
+    <span class="k">const</span> temp = <span class="s">`${config.dbFile}.${process.pid}.tmp`</span>;
+    <span class="k">await</span> fs.promises.writeFile(temp, snapshot, <span class="s">'utf8'</span>);
+    <span class="k">await</span> fs.promises.rename(temp, config.dbFile);
+  });
+  <span class="k">return</span> <span class="k">this</span>.writeQueue;
+}</pre>
+    </div>
+    <p>读的时候也不能客气。启动时会校验根节点是对象、五个集合字段是数组、<code>settings</code> 是对象；任何一条不满足，就不启动，并抛出一个明确说「原文件已保留，请修复或从备份恢复」的错误。宁可开不了机，也不要带着一份被误解的数据跑起来——那会让后面每一条记录都变成嫌疑犯。</p>
+
+    <h3>缩略图：一个可以失败的优化</h3>
+    <p>图库列表不加载原图。每张图在落盘后会预热一张 640px 宽的 WebP，质量 72，effort 3；启动时回填历史图片，请求时按需补齐。列表接口只返回缩略图路径，点开大图才取原图。</p>
+    <p>但 sharp 是可选依赖。它在某些平台缺预编译包，加载会失败。这套代码的处理是：<code>import('sharp').then(m =&gt; m.default).catch(() =&gt; null)</code>，拿不到就返回空字符串，所有接口静默降级为原图。同理，缩略图生成过程中的任何异常都被吞掉，返回空串。</p>
+    <p>这不是「错误处理写得马虎」，是一个刻意的分级：<strong>缩略图是性能优化，不是功能。</strong>它失败时，用户应该看到慢一点的图库，而不是一个报错页面。区分「可以失败的优化」和「不可以失败的功能」，比给每个 catch 都加日志更重要。</p>
+    <p>还有一个小细节：同一张图的缩略图生成请求会被 <code>inFlight</code> 这张 Map 合并。列表一次请求 20 条、其中 5 条都缺缩略图时，sharp 只会被调用 5 次，不是 20 次。并发去重在这里比任何缓存都值钱，因为生成只需要几十毫秒，重复生成却会同时占满 CPU。</p>
+
+    <figure class="fig">
+      <div class="frame"><img src="assets/art/develop.webp" alt="暗房显影盘特写：一张相纸浸在显影液里，左半已经浮出城市与河流的影像，右半仍是空白，液面有琥珀色安全灯的反光" width="1024" height="1024"/></div>
+      <figcaption><b>FIG. 03</b>显影的中间态是危险的：一半有影、一半空白。落盘的原子性就是为了永远不把这种半成品交出去。</figcaption>
+    </figure>
+
+    <h3>把「你要的」和「你要到的」记在一起</h3>
+    <p>回到那张表情包。记录里同时躺着两组数字：请求的 <code>size: "auto"</code>，和实际的 <code>width: 1448, height: 1086</code>。前者是意图，后者是事实。这个项目没有试图让两者一致——它只是把两者都存了下来，然后让 UI 在需要的时候显示事实。</p>
+    <div class="rec-card">
+      <div class="rc-top"><span>GENERATION</span><b>626a361b</b></div>
+      <div class="rc-body">
+        <div class="rc-row"><span>PROMPT</span><b>生成一张 3840×2160、16:9 的单张完整表情包总图：4行×6列共24格……</b></div>
+        <div class="rc-row"><span>SIZE 请求</span><b class="hot">auto</b></div>
+        <div class="rc-row"><span>实际像素</span><b>1448 × 1086</b></div>
+        <div class="rc-row"><span>文件</span><b>f5b15a20….png · 1,816,647 B</b></div>
+        <div class="rc-row"><span>SHA-256</span><b>3ecb5f1b…c48bb5</b></div>
+        <div class="rc-row"><span>耗时</span><b>排队 + 生成，分两段记</b></div>
+      </div>
+    </div>
+    <p>这张记录不是装饰。它是这个工具敢不敢说「我生成过」的唯一凭据：文件在不在、多大、什么哈希、多少像素、花了多久、走的哪条渠道。缺任何一项，「生成成功」都只是一句自述。</p>
+  </div>
+</section>
